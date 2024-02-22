@@ -60,6 +60,31 @@ def data_reupload(n_features:int, n_layers:int):
     return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features)
 
 
+### WARNING: DOES NOT WORK DUE TO PENNYLANE VERSION NEEDS < 0.34 ###
+def mid_measure(n_features:int, n_layers:int, n_repitions:int):
+    
+    def repition(inputs,weights,i):
+        if not (i % 2):
+            qml.StronglyEntanglingLayers(weights[0:1], wires=range(n_features))
+            for j in range(1,n_layers+1):
+                qml.AngleEmbedding(inputs, wires=range(n_features))
+                qml.StronglyEntanglingLayers(weights[j:j+1], wires=range(n_features))
+            if i != n_repitions - 1:
+                qml.measure(0, reset=True)
+
+        else:
+            qml.StronglyEntanglingLayers(weights[0:1,1:], wires=range(1,n_features))
+            for j in range(1,n_layers+1):
+                qml.AngleEmbedding(inputs[1:], wires=range(1,n_features))
+                qml.StronglyEntanglingLayers(weights[j:j+1,1:], wires=range(1,n_features))
+            
+    def model(inputs, weights):
+        for i in range(n_repitions):
+            repition(inputs,weights[i],i)
+            
+    return model, (n_repitions,n_layers,n_features,3)
+
+
 
 class qnn_compiler():
   

@@ -88,7 +88,6 @@ class ClassifierQNN():
 
             if epoch % 10 == 0:
                 pass
-                
 
         # Store trained parameters
         self.fit_params = params
