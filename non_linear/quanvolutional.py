@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import utils.graph_utils
 
 from models import qnn_compiler
+from fourier import SampleFourierCoefficients
 
 from numpy import ndarray
 
@@ -170,14 +171,6 @@ class QCNN():
         # Store trained parameters
         self.fit_params = params
     
-    
-    def batched(self, inputs, params):
-
-        batched_passes = jax.vmap(self.forward_pass, (0, None))
-        forward = jax.jit(batched_passes)
-
-        return forward(inputs, params)
-    
        
     def score_model(self):
 
@@ -273,3 +266,11 @@ class QCNN():
         plt.grid()
 
         return figure
+    
+    
+    def fourier_coefficents(self, n_coeffs:int = 5, n_samples:int = 100):
+        self.target_length = 1
+        fourier = SampleFourierCoefficients(self.batched, parameter_shape=(self.parameter_count, ),  n_features=self.n_features)
+        fourier.random_sample(n_coeffs, n_samples)
+        self.target_length = self.target.shape[1]
+        fourier.plot_coeffs()

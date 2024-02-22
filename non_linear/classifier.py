@@ -15,7 +15,7 @@ from matplotlib.ticker import AutoMinorLocator
 import utils.graph_utils
 
 from models import qnn_compiler
-from fourier import FourierCoefficents
+from fourier import SampleFourierCoefficients
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -34,7 +34,9 @@ class ClassifierQNN():
         qnn_batched = jax.vmap(qnn, (0, None))
         self.qnn = jax.jit(qnn_batched)
         
-        self.fourier = FourierCoefficents(model, data, n_layers)
+        compiler = qnn_compiler(model, self.n_features, n_layers, 1)
+        qnn = compiler.classification()
+        self.fourier = SampleFourierCoefficients(qnn, self.parameter_shape, self.n_features)
 
 
     def train_test_split(self, test_size:float=0.20):
@@ -189,3 +191,9 @@ class ClassifierQNN():
         plt.grid()
 
         return figure
+    
+    
+    def fourier_coefficents(self):
+        self.fourier.random_sample(5, 100)
+        self.fourier.plot_coeffs()
+    
