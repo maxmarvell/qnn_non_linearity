@@ -11,6 +11,8 @@ from sklearn.metrics import accuracy_score
 
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
+import utils.graph_utils
 
 from models import qnn_compiler
 from fourier import FourierCoefficents
@@ -120,33 +122,70 @@ class ClassifierQNN():
         cm = plt.cm.RdBu
         cm_bright = ListedColormap(["#FF0000", "#0000FF"])
         ax = plt.subplot(111)
+        
+        ax.minorticks_on()
+        ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.grid(which='minor', linewidth=0.5, alpha=0.5)
+        ax.set(xlabel=R'$x$', ylabel=R"$y$")
+        plt.xlabel("x", size=14, fontname="Times New Roman", labelpad=10)
+        plt.ylabel("y", size=14, fontname="Times New Roman", labelpad=10)
 
         # Apply final params to test set
-        yp = self.qnn(self.X_test, self.fit_params)
-        yp = jax.nn.softmax(yp)
-        yp = jnp.argmax(yp, axis=1)
+        yp_test = self.qnn(self.X_test, self.fit_params)
+        yp_test = jax.nn.softmax(yp_test)
+        yp_test = jnp.argmax(yp_test, axis=1)
 
         # Plot the testing points
         ax.scatter(
             self.X_test[:, 0],
             self.X_test[:, 1],
-            c=yp,
+            c=yp_test,
             cmap=cm_bright,
             edgecolors="k",
             alpha=0.6,
         )
 
         # Apply final params to test set
-        yp = self.qnn(self.X_train, self.fit_params)
-        yp = jax.nn.softmax(yp)
-        yp = jnp.argmax(yp, axis=1)
+        yp_train = self.qnn(self.X_train, self.fit_params)
+        yp_train = jax.nn.softmax(yp_train)
+        yp_train = jnp.argmax(yp_train, axis=1)
 
         # Plot the testing points
         ax.scatter(
             self.X_train[:, 0],
             self.X_train[:, 1],
-            c=yp,
+            c=yp_train,
             cmap=cm_bright,
             edgecolors="k",
             alpha=0.6,
         )
+        
+        # Identify errors 
+        errors = yp_test - jnp.argmax(self.y_test, axis=1)
+        args = jnp.argwhere(errors != 0)
+        
+        ax.scatter(
+            self.X_test[args, 0],
+            self.X_test[args, 1],
+            edgecolors="c",
+            linewidths=1.8,
+            s=120, 
+            facecolors='none',
+        )
+        
+        errors = yp_train - jnp.argmax(self.y_train, axis=1)
+        args = jnp.argwhere(errors != 0)
+        
+        ax.scatter(
+            self.X_train[args, 0],
+            self.X_train[args, 1],
+            edgecolors="c",
+            linewidths=1.8,
+            s=120, 
+            facecolors='none',
+        )
+        
+        plt.grid()
+
+        return figure

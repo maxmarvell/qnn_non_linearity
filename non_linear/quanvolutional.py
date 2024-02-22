@@ -1,19 +1,18 @@
 from functools import partial
-from torch.nn import Sigmoid
 import pennylane as qml
 import pennylane.numpy as np
 import jax.numpy as jnp
 import jax
 import optax
 import random
-import torch
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
 from matplotlib.colors import ListedColormap
+from matplotlib.ticker import AutoMinorLocator
 import matplotlib.pyplot as plt
-
+import utils.graph_utils
 
 from models import qnn_compiler
 
@@ -202,59 +201,75 @@ class QCNN():
 
 
     def plot_fit(self):
-
+        
         figure = plt.figure()
         cm = plt.cm.RdBu
         cm_bright = ListedColormap(["#FF0000", "#0000FF"])
         ax = plt.subplot(111)
+        
+        ax.minorticks_on()
+        ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.grid(which='minor', linewidth=0.5, alpha=0.5)
+        ax.set(xlabel=R'$x$', ylabel=R"$y$")
+        plt.xlabel("x", size=14, fontname="Times New Roman", labelpad=10)
+        plt.ylabel("y", size=14, fontname="Times New Roman", labelpad=10)
 
         # Apply final params to test set
-        yp = self.batched(self.X_test, self.fit_params).reshape(-1, self.target_length)
-        yp = jax.nn.softmax(yp)
-        yp = jnp.argmax(yp, axis=1)
+        yp_test = self.batched(self.X_test, self.fit_params).reshape(-1, self.target_length)
+        yp_test = jax.nn.softmax(yp_test)
+        yp_test = jnp.argmax(yp_test, axis=1)
 
         # Plot the testing points
         ax.scatter(
             self.X_test[:, 0],
             self.X_test[:, 1],
-            c=yp,
+            c=yp_test,
             cmap=cm_bright,
             edgecolors="k",
             alpha=0.6,
         )
 
         # Apply final params to test set
-        yp = self.batched(self.X_train, self.fit_params).reshape(-1, self.target_length)
-        yp = jax.nn.softmax(yp)
-        yp = jnp.argmax(yp, axis=1)
+        yp_train = self.batched(self.X_train, self.fit_params).reshape(-1, self.target_length)
+        yp_train = jax.nn.softmax(yp_train)
+        yp_train = jnp.argmax(yp_train, axis=1)
 
         # Plot the testing points
         ax.scatter(
             self.X_train[:, 0],
             self.X_train[:, 1],
-            c=yp,
+            c=yp_train,
             cmap=cm_bright,
             edgecolors="k",
             alpha=0.6,
         )
         
-        plt.show()
+        # Identify errors 
+        errors = yp_test - jnp.argmax(self.y_test, axis=1)
+        args = jnp.argwhere(errors != 0)
+        
+        ax.scatter(
+            self.X_test[args, 0],
+            self.X_test[args, 1],
+            edgecolors="c",
+            linewidths=1.8,
+            s=120, 
+            facecolors='none',
+        )
+        
+        errors = yp_train - jnp.argmax(self.y_train, axis=1)
+        args = jnp.argwhere(errors != 0)
+        
+        ax.scatter(
+            self.X_train[args, 0],
+            self.X_train[args, 1],
+            edgecolors="c",
+            linewidths=1.8,
+            s=120, 
+            facecolors='none',
+        )
+        
+        plt.grid()
 
-
-from models import simple_ansatz, data_reupload 
-from sklearn.datasets import make_moons
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-
-data, target = make_moons(n_samples=500,noise=.2)
-scalerOHE = OneHotEncoder(sparse_output=False)
-encoded_target = scalerOHE.fit_transform(target.reshape(-1,1))
-sScaler = StandardScaler()
-encoded_data = sScaler.fit_transform(data)
-    
-qcnn = QCNN(data_reupload, encoded_data, encoded_target, 3, method="ACAF")
-
-qcnn.train_test_split()
-qcnn.learn_model(epochs=100)
-qcnn.score_model()
-qcnn.plot_fit()
+        return figure
