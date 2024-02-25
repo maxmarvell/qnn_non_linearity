@@ -273,4 +273,4 @@ class QCNN():
         fourier = SampleFourierCoefficients(self.batched, parameter_shape=(self.parameter_count, ),  n_features=self.n_features)
         fourier.random_sample(n_coeffs, n_samples)
         self.target_length = self.target.shape[1]
-        fourier.plot_coeffs()
+        return fourier.plot_coeffs()

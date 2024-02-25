@@ -59,7 +59,8 @@ class SampleFourierCoefficients():
             ax_.set_xlim(-1, 1)
 
         plt.tight_layout(pad=0.5)
-        plt.show()
+        
+        return fig
         
         
         

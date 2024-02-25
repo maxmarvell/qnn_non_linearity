@@ -25,7 +25,7 @@ N_FEATURES = 5
 # sScaler = StandardScaler()
 # encoded_data = sScaler.fit_transform(data)
 
-# # Encode the data
+# # # Encode the data
 # # autoencoder = Autoencoder(encoded_data, N_FEATURES)
 # # encoded_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
 
@@ -35,19 +35,15 @@ N_FEATURES = 5
 # # Train the model
 # classifier = ClassifierQNN(model, encoded_data, encoded_target, N_LAYERS)
 
-# classifier.fourier_coefficents()
+# fig = classifier.fourier_coefficents()
+# fig.savefig("./graphs/classifier/data_reupload/sample_fourier_coeffs.svg", format='svg', bbox_inches="tight")
+
 
 # classifier.train_test_split()
 # classifier.learn_model(epochs=100)
 # classifier.score_model()
 # fig = classifier.plot_fit()
 # fig.savefig("./graphs/classifier/data_reupload/sample.svg", format='svg', bbox_inches="tight")
-
-
-### SAMPLE FISHERS OF QUANTUM MODEL ###
-
-import models
-from classifier import ClassifierQNN
 
 
 ### CONVOLUTIONAL CLASSIFICATION EXAMPLE ###
@@ -70,18 +66,17 @@ encoded_data = sScaler.fit_transform(data)
 # autoencoder = Autoencoder(encoded_data, N_FEATURES)
 # encoded_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
 
-model = models.data_reupload
+model = models.simple_ansatz
     
 qcnn = QCNN(model, encoded_data, encoded_target, N_LAYERS)
 
-qcnn.fourier_coefficents()
+fig = qcnn.fourier_coefficents()
+fig.savefig("./graphs/convolution/classical_activation/simple_ansatz/sample_fourier_coeffs.svg", format='svg', bbox_inches="tight")
 
 qcnn = QCNN(model, encoded_data, encoded_target, N_LAYERS)
 qcnn.train_test_split()
 qcnn.learn_model(epochs=100)
 qcnn.score_model()
 fig = qcnn.plot_fit()
-fig.savefig("./graphs/convolution/regular/data_reupload/sample.svg", format='svg', bbox_inches="tight")
+fig.savefig("./graphs/convolution/classical_activation/simple_ansatz/sample.svg", format='svg', bbox_inches="tight")
 
-
-### 

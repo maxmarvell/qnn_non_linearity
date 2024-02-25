@@ -195,5 +195,7 @@ class ClassifierQNN():
     
     def fourier_coefficents(self):
         self.fourier.random_sample(5, 100)
-        self.fourier.plot_coeffs()
+        return self.fourier.plot_coeffs()
+
+
     
