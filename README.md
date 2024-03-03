@@ -23,7 +23,6 @@ The contents of this repository follow as:
 
 2. A repository ```graphs``` containing all of the graphs generated and used for this project
 
-
 ## Background
 
 ## Usage
@@ -41,3 +40,8 @@ import torch
 
 
 ## Results and Discussion
+
+Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
+
+The first follows [Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605), by representing the model a as a fourier series we uncover that the power of the model depends on the coefficents the model has access to control. A model with only a few adjustable fourier coefficents is naturally going to act as a weaker arbitrary function approximator.
+

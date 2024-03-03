@@ -10,4 +10,9 @@ venv/
 .DS_Store
 
 
+# cache
 */__pycache__/
+
+
+# other files
+non_linear/example.py
