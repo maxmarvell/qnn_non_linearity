@@ -16,3 +16,4 @@ venv/
 
 # other files
 non_linear/example.py
+plot_fourier_coefficents.py

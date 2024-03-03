@@ -4,7 +4,7 @@ import jax
 
 from numpy import ndarray
 
-from models import qnn_compiler
+from non_linear.models import qnn_compiler
 
 # Defining a class that computes fourier coefficents given a quantum model
 
@@ -23,7 +23,7 @@ class SampleFourierCoefficients():
         t = np.tile(np.linspace(0,2*np.pi,n_coeffs,endpoint=False), (self.n_features, 1)).T
 
         # Apply fourier transform to estimate fourier coefficents
-        y = np.fft.rfft(f(t).reshape(-1,n_coeffs)) / t[0].size
+        y = np.fft.rfft(f(t)) / t[0].size
 
         return y
 
@@ -46,10 +46,17 @@ class SampleFourierCoefficients():
         return np.real(coeffs), np.imag(coeffs)
 
 
-    def plot_coeffs(self):
+    def plot_coeffs(self, show:bool = False, ax = None):
 
+        # get number of fourier coeffs
         n_coeffs = len(self.coeffs_real[0])
-        fig, ax = plt.subplots(1, n_coeffs, figsize=(15,4))
+        
+        # if no array of axes provided set a default
+        if type(ax) != ndarray: 
+            fig, ax = plt.subplots(1, n_coeffs, figsize=(15,4))
+            plt.tight_layout(pad=0.5)
+
+        assert len(ax) == n_coeffs, "Length of axes should be same as number of fourier coefficents!"
 
         for idx, ax_ in enumerate(ax):
             ax_.set_title(r"$c_{}$".format(idx))
@@ -58,44 +65,6 @@ class SampleFourierCoefficients():
             ax_.set_ylim(-1, 1)
             ax_.set_xlim(-1, 1)
 
-        plt.tight_layout(pad=0.5)
-        
-        return fig
-        
-        
-        
-class FourierCoefficents():
-    def __init__(self, model:any, data:ndarray, n_layers) -> None:
-        
-        self.n_features = data.shape[1]
-        self.data = data
-        
-        compiler = qnn_compiler(model, self.n_features, n_layers, 1)
-        self.qnn = compiler.classification()
-        # qnn_batched = jax.vmap(qnn, (0, None))
-        
-        # self.qnn = jax.jit(qnn_batched)
+        if show: plt.show()
 
-    def get_coeffs(self, params:ndarray):
-        # Apply fourier transform to estimate fourier coefficents
-        data = self.data[0]
-        coeffs = np.fft.rfft(self.qnn(self.data[0], params)) / self.data[0].size
-        self.coeffs_real = np.real(coeffs)
-        self.coeffs_imag = np.imag(coeffs)
-        
-        return np.real(coeffs), np.imag(coeffs)
-
-    def plot_coeffs(self):
-
-        n_coeffs = len(self.coeffs_real[0])
-        fig, ax = plt.subplots(1, n_coeffs, figsize=(15,4))
-
-        for idx, ax_ in enumerate(ax):
-            ax_.set_title(r"$c_{}$".format(idx))
-            ax_.scatter(self.coeffs_real[:, idx], self.coeffs_imag[:, idx], s=35, facecolor='white', edgecolor='red')
-            ax_.set_aspect("equal")
-            ax_.set_ylim(-1, 1)
-            ax_.set_xlim(-1, 1)
-
-        plt.tight_layout(pad=0.5)
-        plt.show()
+        if type(ax) != ndarray: return fig

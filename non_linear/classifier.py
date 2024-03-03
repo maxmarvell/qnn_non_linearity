@@ -12,10 +12,10 @@ from sklearn.metrics import accuracy_score
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
-import utils.graph_utils
+from non_linear.utils import graph_utils
 
-from models import qnn_compiler
-from fourier import SampleFourierCoefficients
+from non_linear.models import qnn_compiler
+from non_linear.fourier import SampleFourierCoefficients
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -23,20 +23,25 @@ class ClassifierQNN():
     def __init__(self, model: any, data: np.ndarray, target: np.ndarray, n_layers: int) -> None:
         self.target_length = target.shape[1]
         self.n_features = data.shape[1]
+        self.n_layers = n_layers
         
         self.model = model
         self.data = data
         self.target = target
 
+        # configure the compiler for classification
         compiler = qnn_compiler(model, self.n_features, n_layers, self.target_length)
         self.parameter_shape = compiler.parameter_shape
         qnn = compiler.classification()
         qnn_batched = jax.vmap(qnn, (0, None))
         self.qnn = jax.jit(qnn_batched)
         
+        # configure the compiler for sampling fouriers
         compiler = qnn_compiler(model, self.n_features, n_layers, 1)
         qnn = compiler.classification()
         self.fourier = SampleFourierCoefficients(qnn, self.parameter_shape, self.n_features)
+
+        # configure the compile for sampling classical fisher information
 
 
     def train_test_split(self, test_size:float=0.20):
@@ -193,9 +198,6 @@ class ClassifierQNN():
         return figure
     
     
-    def fourier_coefficents(self):
-        self.fourier.random_sample(5, 100)
-        return self.fourier.plot_coeffs()
-
-
-    
+    def fourier_coefficents(self, n_samples:int = 100, n_coeffs:int = 5, show:bool = False, ax = None):
+        self.fourier.random_sample(n_coeffs, n_samples)
+        return self.fourier.plot_coeffs(show, ax)

@@ -13,8 +13,8 @@ tex_fonts = {
     "ytick.labelsize": 8
 }
 
-plt.style.use("dark_background")
 plt.style.use('seaborn-v0_8-darkgrid')
+# plt.style.use("dark_background")
 plt.rc('text.latex', preamble=R'\usepackage{amsmath} \usepackage{bbold}')
 plt.rcParams.update(tex_fonts)
 
