@@ -23,7 +23,7 @@ class SampleFourierCoefficients():
         t = np.tile(np.linspace(0,2*np.pi,n_coeffs,endpoint=False), (self.n_features, 1)).T
 
         # Apply fourier transform to estimate fourier coefficents
-        y = np.fft.rfft(f(t)) / t[0].size
+        y = np.fft.rfft(f(t).reshape(-1,n_coeffs)) / t[0].size
 
         return y
 

@@ -12,10 +12,10 @@ from sklearn.metrics import accuracy_score
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.pyplot as plt
-import utils.graph_utils
+import non_linear.utils.graph_utils
 
-from models import qnn_compiler
-from fourier import SampleFourierCoefficients
+from non_linear.models import qnn_compiler
+from non_linear.fourier import SampleFourierCoefficients
 
 from numpy import ndarray
 
@@ -268,9 +268,9 @@ class QCNN():
         return figure
     
     
-    def fourier_coefficents(self, n_coeffs:int = 5, n_samples:int = 100):
+    def fourier_coefficents(self, n_coeffs:int = 5, n_samples:int = 100, show:bool = False, ax = None):
         self.target_length = 1
         fourier = SampleFourierCoefficients(self.batched, parameter_shape=(self.parameter_count, ),  n_features=self.n_features)
         fourier.random_sample(n_coeffs, n_samples)
         self.target_length = self.target.shape[1]
-        return fourier.plot_coeffs()
+        return fourier.plot_coeffs(show, ax)
