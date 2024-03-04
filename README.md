@@ -54,3 +54,8 @@ With Convolutional network simple ansatz no data reupload
 With Convolutional network simple ansatz and data reupload
 
 ![Fourier Coefficents sampling on elementary VQC models](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/fourier/convolution_data_reupload.svg?raw=true)
+
+
+Sample Fisher Information eigenvalue distributions
+
+![Eigenvalue distribution of classical fisher information matrix](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/fisher/compare_VQC_models.svg?raw=true)
