@@ -106,7 +106,7 @@ class qnn_compiler():
         return jax.jit(qnn)
         
 
-    def probabilites(self):
+    def state(self):
         dev = qml.device("default.qubit.jax", wires=self.n_features)
 
         @qml.qnode(dev,interface='jax')
@@ -117,7 +117,7 @@ class qnn_compiler():
         return jax.jit(qnn)
     
 
-    def state(self):
+    def probabilites(self):
         dev = qml.device("default.qubit.jax", wires=self.n_features)
 
         @qml.qnode(dev,interface='jax')

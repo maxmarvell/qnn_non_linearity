@@ -9,9 +9,10 @@ from non_linear.models import qnn_compiler
 # Defining a class that computes fourier coefficents given a quantum model
 
 class SampleFourierCoefficients():
-    def __init__(self, model:any, parameter_shape:tuple, n_features:int) -> None:
-        self.model = model
-        self.parameter_shape = parameter_shape
+    def __init__(self, model:any, n_features:int, n_layers:int) -> None:
+        compiler = qnn_compiler(model, n_features, n_layers, 1)
+        self.parameter_shape = compiler.parameter_shape
+        self.qnn = compiler.classification()
         self.n_features = n_features
 
     def get_coeffs(self,f,K):
@@ -32,9 +33,9 @@ class SampleFourierCoefficients():
 
         def f(x):
             # Return the parametrised circuit
-            batched_model = jax.vmap(self.model, (None, 0))
-            model = jax.jit(batched_model)
-            return model(x, self.params)
+            batched_qnn = jax.vmap(self.qnn, (None, 0))
+            qnn = jax.jit(batched_qnn)
+            return qnn(x, self.params)
 
         self.params = np.array([jax.random.uniform(jax.random.PRNGKey(i), shape=self.parameter_shape)*2*np.pi for i in range(n_samples)])
 

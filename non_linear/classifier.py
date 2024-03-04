@@ -16,6 +16,7 @@ from non_linear.utils import graph_utils
 
 from non_linear.models import qnn_compiler
 from non_linear.fourier import SampleFourierCoefficients
+from non_linear.fisher import FisherInformation
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -37,11 +38,10 @@ class ClassifierQNN():
         self.qnn = jax.jit(qnn_batched)
         
         # configure the compiler for sampling fouriers
-        compiler = qnn_compiler(model, self.n_features, n_layers, 1)
-        qnn = compiler.classification()
-        self.fourier = SampleFourierCoefficients(qnn, self.parameter_shape, self.n_features)
+        self.fourier = SampleFourierCoefficients(model, n_features=self.n_features, n_layers=n_layers)
 
         # configure the compile for sampling classical fisher information
+        self.fisher = FisherInformation(model, n_features=self.n_features, n_layers=n_layers)
 
 
     def train_test_split(self, test_size:float=0.20):
@@ -197,7 +197,11 @@ class ClassifierQNN():
 
         return figure
     
-    
+
     def fourier_coefficents(self, n_samples:int = 100, n_coeffs:int = 5, show:bool = False, ax = None):
         self.fourier.random_sample(n_coeffs, n_samples)
         return self.fourier.plot_coeffs(show, ax)
+    
+    def classical_fisher_information(self, n_samples, show:bool = False, ax = None):
+        self.fisher.sample_fishers(n_samples)
+        return self.fisher.plot_eigenvalue_distribution(show, ax)
