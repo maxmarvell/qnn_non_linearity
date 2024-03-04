@@ -58,4 +58,4 @@ With Convolutional network simple ansatz and data reupload
 
 Sample Fisher Information eigenvalue distributions
 
-![Eigenvalue distribution of classical fisher information matrix](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/fisher/compare_VQC_models.svg?raw=true)
+![Eigenvalue distribution of classical fisher information matrix](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classical_fisher/compare_VQC_models.svg?raw=true)
