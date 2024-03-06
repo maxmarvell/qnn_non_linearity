@@ -19,42 +19,56 @@ from non_linear.fourier import SampleFourierCoefficients
 from non_linear.fisher import FisherInformation
 from non_linear.qfisher import QuantumFisherInformation
 
+from non_linear.utils.linked_list import NNLinkedList, LearnModelData
+
 # Class for classification tasks
 class ClassifierQNN():
 
     def __init__(self, model: any, data: np.ndarray, target: np.ndarray, n_layers: int) -> None:
+
+        # extract target length and number of features
         self.target_length = target.shape[1]
         self.n_features = data.shape[1]
+
+        # store number of layers
         self.n_layers = n_layers
         
+        # store other
         self.model = model
         self.data = data
         self.target = target
 
         # configure the compiler for classification
-        compiler = qnn_compiler(model, self.n_features, n_layers, self.target_length)
-        self.parameter_shape = compiler.parameter_shape
-        qnn = compiler.classification()
-        qnn_batched = jax.vmap(qnn, (0, None))
-        self.qnn = jax.jit(qnn_batched)
-        
-        # configure the compiler for sampling fouriers
-        self.fourier = SampleFourierCoefficients(model, n_features=self.n_features, n_layers=n_layers)
+        self.compiler = qnn_compiler(model, self.n_features, n_layers, self.target_length)
 
-        # configure the compile for sampling classical fisher information
-        self.fisher = FisherInformation(model, n_features=self.n_features, n_layers=n_layers)
+        # extract the correct parameter shape
+        self.parameter_shape = self.compiler.parameter_shape
 
-        # configure the compile for sampling classical fisher information
-        self.qfisher = QuantumFisherInformation(model, n_features=self.n_features, n_layers=n_layers)
+        # batch the input to the classifier
+        qnn = self.compiler.classification()
+        batched = jax.vmap(qnn, (0, None))
+        self.qnn = jax.jit(batched)
 
     def train_test_split(self, test_size:float=0.20):
-        res = train_test_split(self.data, self.target, test_size=0.20, random_state=42)
-        self.X_train, self.X_test, self.y_train, self.y_test = res
-        return res
+
+        '''
+            splits input into test and train set, interface to reduce complexity in number of params for __init__
+
+            **kwargs:
+                test_size: the proporion of samples that should be assigned to the test
+        '''
+
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data, self.target, test_size=0.20, random_state=42)
+        return self.X_train, self.X_test, self.y_train, self.y_test
 
 
     @partial(jax.jit, static_argnums=(0,))
     def cross_entropy_loss(self, y_true, y_pred):
+
+        '''
+            calculate cross entropy loss between prediction and true target
+        '''
+
         return -jnp.mean(jnp.sum(jnp.log(y_pred) * y_true, axis=1))
 
     @partial(jax.jit, static_argnums=(0,))
@@ -92,14 +106,32 @@ class ClassifierQNN():
         # Initialize optimizer
         opt_state = self.optimizer.init(initial_params)
 
+        # init empty list to store fishers, qfishers, etc
+        self.training_data = np.empty((epoch // 25, ))
+
         ##### FIT #####
         for epoch in range(epochs):
             params, opt_state, cost = self.optimizer_update(opt_state, params, self.X_train, self.y_train)
             if epoch % 5 == 0:
                 print(f'epoch: {epoch}\t cost: {cost}')
 
-            if epoch % 10 == 0:
-                pass
+            if epoch % 25 == 0:
+
+                i = epoch // 25
+
+                fisher = FisherInformation(self.compiler)
+                fisher.fisher_information_matrix = fisher.batched_fisher_information(self.X_train, params)
+
+                qfisher = QuantumFisherInformation(self.compiler)
+                qfisher.quantum_fisher_information_matrix = qfisher.batched_quantum_fisher_information(self.X_train, params)
+
+                y_pred = self.qnn(self.data, params)
+                
+                self.training_data[i] = LearnModelData(
+                    fisher_information=fisher, 
+                    quantum_fisher_information=qfisher,
+                    y_pred=y_pred
+                )
 
         # Store trained parameters
         self.fit_params = params
@@ -204,12 +236,3 @@ class ClassifierQNN():
     def fourier_coefficents(self, n_samples:int = 100, n_coeffs:int = 5, show:bool = False, ax = None):
         self.fourier.random_sample(n_coeffs, n_samples)
         return self.fourier.plot_coeffs(show, ax)
-    
-    def classical_fisher_information(self, n_samples, show:bool = False, ax = None):
-        self.fisher.sample_fishers(n_samples)
-        return self.fisher.plot_eigenvalue_distribution(show, ax)
-    
-    def quantum_fisher_information(self, n_samples, show:bool = False, ax = None):
-        self.qfisher.sample_QFI(n_samples)
-        self.qfisher.sample_eigenvalues(n_samples)
-        return self.qfisher.plot_eigenvalue_distribution(show, ax)
