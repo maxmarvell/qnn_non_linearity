@@ -17,6 +17,7 @@ from non_linear.utils import graph_utils
 from non_linear.models import qnn_compiler
 from non_linear.fourier import SampleFourierCoefficients
 from non_linear.fisher import FisherInformation
+from non_linear.qfisher import QuantumFisherInformation
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -43,6 +44,8 @@ class ClassifierQNN():
         # configure the compile for sampling classical fisher information
         self.fisher = FisherInformation(model, n_features=self.n_features, n_layers=n_layers)
 
+        # configure the compile for sampling classical fisher information
+        self.qfisher = QuantumFisherInformation(model, n_features=self.n_features, n_layers=n_layers)
 
     def train_test_split(self, test_size:float=0.20):
         res = train_test_split(self.data, self.target, test_size=0.20, random_state=42)
@@ -205,3 +208,8 @@ class ClassifierQNN():
     def classical_fisher_information(self, n_samples, show:bool = False, ax = None):
         self.fisher.sample_fishers(n_samples)
         return self.fisher.plot_eigenvalue_distribution(show, ax)
+    
+    def quantum_fisher_information(self, n_samples, show:bool = False, ax = None):
+        self.qfisher.sample_QFI(n_samples)
+        self.qfisher.sample_eigenvalues(n_samples)
+        return self.qfisher.plot_eigenvalue_distribution(show, ax)

@@ -16,8 +16,12 @@ import non_linear.utils.graph_utils
 
 from non_linear.models import qnn_compiler
 from non_linear.fourier import SampleFourierCoefficients
+from non_linear.fisher import FisherInformation
+from non_linear.qfisher import QuantumFisherInformation
+from non_linear.utils.linked_list import NNLinkedList, Node
 
 from numpy import ndarray
+from copy import deepcopy
 
 class QCNN():
 
@@ -25,31 +29,38 @@ class QCNN():
         
         '''
             args:
-                model:
-                data:
-                target:
-                n_layers:
+                model: a model for a variational quantum circuit to implement
+                data: the dataset
+                target: the target variable
+                n_layers: the number of layers of each qnode
         
             **kwargs:
                 nn_layers:  structure of the hybrid classical qunatum convolutional neural network
                 method:     parametrisation method, "REG" only parametrise quantum circuit, "ACAF" parametrise classical non-linear activation function
         '''
         
-        
+        # extract the target length and the number of features required
         self.target_length = target.shape[1]
         self.n_features = data.shape[1]
         
+        # store classification data
         self.target = target
         self.data = data
-    
+
+        # store model parameters to class
         self.n_layers = n_layers
         self.nn_layers = nn_layers
         self.model = model
         self.method = method
 
+        # initialise linked list to store fisher informations
+        self.llist = NNLinkedList()
+
+        # init parameter count
         count = 0
         parameter_shapes = []
 
+        # build out parameter shape for the convolutional network
         for i, v in enumerate(self.nn_layers):
             if i == 0:
                 param_shape = qml.StronglyEntanglingLayers.shape(n_layers=self.n_layers, n_wires=self.n_features)
@@ -61,60 +72,119 @@ class QCNN():
                 
             count += v * np.product(param_shape)
             parameter_shapes.append((v, *param_shape))
-            
+        
+        # store parameter quantities
         self.parameter_shapes = parameter_shapes
         self.parameter_count = count
-    
 
     def train_test_split(self, test_size:float=0.20):
-        res = train_test_split(self.data, self.target, test_size=0.20, random_state=42)
-        self.X_train, self.X_test, self.y_train, self.y_test = res
-        return res
 
+        '''
+            splits input into test and train set, interface to reduce complexity in number of params for __init__
 
-    @partial(jax.jit, static_argnums=(0))
-    def forward_pass(self, inputs:ndarray, params:ndarray):
+            **kwargs:
+                test_size: the proporion of samples that should be assigned to the test
+        '''
+
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data, self.target, test_size=test_size, random_state=42)
+        return self.X_train, self.X_test, self.y_train, self.y_test
+
+    @partial(jax.jit, static_argnums=(0,3))
+    def forward_pass(self, 
+                     inputs:ndarray, 
+                     params:ndarray, 
+                     compute_metrics:bool = False):
         
+        '''
+            computes a complete single pass of the entire convolutional neural network for a single sample
+            optionally computes fisher information and/or quantum fisher information at each node.
+
+            args:
+                inputs: first layer of inputs
+                params: full set of trainable parameters for entire network
+            **kwargs:
+                compute_metrics: if true computes the fisher information matrix and quantum fisher information of each node
+        '''
+        
+        # first layer
         depth = 0
+        pointer_node = None
         
+        # loop over layers to build full model (this can be vmapped this way)
         for i, layer in enumerate(self.nn_layers):
+
+            # init node for this layer
+            new_node = Node(layer=i)
+
+            if (pointer_node != None): pointer_node.next = new_node
+            else: self.llist.head = new_node
             
+            # logic to determine compiler target and wire length
             if i == 0:
-                # First layer
+                # first layer
                 compiler = qnn_compiler(self.model, self.n_features, self.n_layers, 1)
             elif i == len(self.nn_layers) - 1:
-                # Output layer
+                # output layer
                 compiler = qnn_compiler(self.model, self.nn_layers[i-1], self.n_layers, self.target_length)
             else:
-                # Hidden layers
+                # hidden layers
                 compiler = qnn_compiler(self.model, self.nn_layers[i-1], self.n_layers, 1)
                 
-            # Here we vmap params not input to process multiple nodes in the same layer
+            # vmap params not input to process multiple nodes in the same layer
             qnn = compiler.classification()
             qnn_batched = jax.vmap(qnn, (None, 0))
             qnn = jax.jit(qnn_batched)
             
+            # get num parameters
             parameter_shape = self.parameter_shapes[i]
-            
-            # Get the num parameters for the first layers
             num_params = np.product(parameter_shape)
-            
+
+            # logic to compute fisher information for given layer where true
+            if self.compute_metrics:
+                fisher = FisherInformation(compiler)
+                fisher.fisher_information_matrix = fisher.batched_fisher_information(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                new_node.fisher_information = fisher
+
+                qfisher = QuantumFisherInformation(compiler)
+                qfisher.quantum_fisher_information_matrix = qfisher.batched_quantum_fisher_information(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                new_node.quantum_fisher_information = qfisher
+
+
+            # outpus of current layer -> inputs of next layer
             inputs = qnn(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+            new_node.outputs = inputs
+
+            # move pointer
+            pointer_node = new_node
             
-            if self.method == "ACAF":
-                inputs = (1 / (1 + jnp.exp(-inputs))) * params[depth+num_params:depth+num_params+layer]
-                depth += layer
-            
+            # increase depth
             depth += num_params
 
+            # conditionally apply classical activation function
+            if self.method == "ACAF":
+                inputs = (1 / (1 + jnp.exp(-inputs))) * params[depth:depth+layer]
+                depth += layer
+            
         return inputs
     
 
-    @partial(jax.jit, static_argnums=(0))
-    def batched(self, inputs, params):
-        forward_pass = jax.vmap(self.forward_pass, (0, None))
+    @partial(jax.jit, static_argnums=(0,3))
+    def batched_forward_pass(self, inputs, params, compute_metrics:bool = False):
+
+        '''
+            computes the single forward pass for many inputs and a single parametrisation
+
+            args:
+                inputs: first layer of inputs
+                params: full set of trainable parameters for entire network
+            **kwargs:
+                compute_fisher: if true computes the fisher information matrix of each node of each sample
+                compute_qfisher: if true computes the quantum fisher information matrix at each node
+        '''
+
+        forward_pass = jax.vmap(self.forward_pass, (0, None, None))
         forward_batched = jax.jit(forward_pass)
-        return forward_batched(inputs, params)  
+        return forward_batched(inputs, params, compute_metrics)  
     
 
     @partial(jax.jit, static_argnums=(0,))
@@ -125,8 +195,10 @@ class QCNN():
     @partial(jax.jit, static_argnums=(0,))
     def calculate_ce_cost(self, X, y, theta):
 
+        batched = jnp.array(self.batched_forward_pass(X, theta))
+
         # Get the target prediction
-        yp = self.batched(X, theta).reshape(-1, self.target_length)
+        yp = batched.reshape(-1, self.target_length)
 
         # Softmax the output
         yp = jax.nn.softmax(yp)
@@ -145,30 +217,44 @@ class QCNN():
     
     
     def learn_model(self, epochs: int, seed: int = random.randrange(1000)):
+
+        '''
+            train the model to obtain a final fit params
+        '''
         
         self.optimizer = optax.adam(learning_rate=0.04)
         
-        # Seed
+        # seed
         key = jax.random.PRNGKey(seed)
 
-        # Initialize circuit params
+        # initialize circuit params
         initial_params = jax.random.normal(key, shape=(self.parameter_count,))
         params = jnp.copy(initial_params)
         
-        # Initialize optimizer
+        # initialize optimizer
         opt_state = self.optimizer.init(initial_params)
+
+        # initialse a list of linked lists to store all the associated data (only sample every 25 epochs)
+        self.training_data = [NNLinkedList() for _ in range(epochs // 25)]
+
+        self.compute_metrics=False
 
 
         ##### FIT #####
         for epoch in range(epochs):
             params, opt_state, cost = self.optimizer_update(opt_state, params)
+
             if epoch % 5 == 0:
                 print(f'epoch: {epoch}\t cost: {cost}')
 
-            if epoch % 10 == 0:
-                pass
+            if epoch % 25 == 0:
+                i = epoch // 25
+                self.compute_metrics=True
+                self.batched_forward_pass(self.X_train, params, compute_metrics=True)
+                self.training_data[i] = self.llist
+                self.compute_metrics=False
 
-        # Store trained parameters
+        # store trained parameters
         self.fit_params = params
     
        
@@ -267,6 +353,11 @@ class QCNN():
 
         return figure
     
+    def plot_fishers(self):
+        pass
+
+    def plot_qfishers(self):
+        pass
     
     def fourier_coefficents(self, n_coeffs:int = 5, n_samples:int = 100, show:bool = False, ax = None):
         self.target_length = 1
