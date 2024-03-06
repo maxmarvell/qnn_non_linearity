@@ -4,6 +4,8 @@ import jax
 
 def variational_ansatz(n_features:int, n_layers:int):
 
+    dev = qml.device("default.qubit.jax", wires=n_features)
+
     def ansatz(i,weights):
         N = len(weights)
 
@@ -36,32 +38,44 @@ def variational_ansatz(n_features:int, n_layers:int):
             qml.AngleEmbedding(inputs, wires=range(n_features))
             ansatz(i,weights[i])
 
-    return model, (n_layers+1,n_features)
+    return model, (n_layers+1,n_features), dev
 
 
 
 def simple_ansatz(n_features:int, n_layers:int):
+
+    dev = qml.device("default.qubit.jax", wires=n_features)
+
     def model(inputs, weights):
         qml.AngleEmbedding(inputs, wires=range(n_features))
         for i in range(n_layers):
             qml.StronglyEntanglingLayers(weights[i:i+1], wires=range(n_features))
     
-    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features)
+    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features), dev
 
 
 
 def data_reupload(n_features:int, n_layers:int):
+
+    dev = qml.device("default.qubit.jax", wires=n_features)
+
     def model(inputs, weights):
         qml.AngleEmbedding(inputs, wires=range(n_features))
         for i in range(n_layers):
             qml.StronglyEntanglingLayers(weights[i:i+1], wires=range(n_features))
             qml.AngleEmbedding(inputs, wires=range(n_features))
     
-    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features)
+    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features), dev
 
 
 ### WARNING: DOES NOT WORK DUE TO PENNYLANE VERSION NEEDS < 0.34 ###
 def mid_measure(n_features:int, n_layers:int, n_repitions:int):
+
+    assert (n_repitions % 2) != 0
+
+    wires=n_features+n_repitions//2
+
+    dev = qml.device("default.qubit.jax", wires=wires)
     
     def repition(inputs,weights,i):
         if not (i % 2):
@@ -82,23 +96,22 @@ def mid_measure(n_features:int, n_layers:int, n_repitions:int):
         for i in range(n_repitions):
             repition(inputs,weights[i],i)
             
-    return model, (n_repitions,n_layers,n_features,3)
+    return model, (n_repitions,n_layers,n_features,3), dev
 
 
 
 class qnn_compiler():
   
     def __init__(self, model, n_features:int, n_layers:int, target_length:int) -> None:
-      self.model, self.parameter_shape = model(n_features,n_layers)
+      self.model, self.parameter_shape, self.dev = model(n_features,n_layers)
       self.n_features = n_features
       self.n_layers = n_layers
       self.target_length = target_length
     
 
     def classification(self):
-        dev = qml.device("default.qubit.jax", wires=self.n_features)
 
-        @qml.qnode(dev,interface='jax')
+        @qml.qnode(self.dev,interface='jax')
         def qnn(inputs,weights):
             self.model(inputs, weights)
             return qml.expval(qml.PauliZ(wires=0)) if self.target_length == 1 else [qml.expval(qml.PauliZ(wires=i)) for i in range(self.target_length)]
@@ -107,8 +120,9 @@ class qnn_compiler():
         
 
     def state(self):
-        dev = qml.device("default.qubit", wires=self.n_features)
 
+        dev = self.dev
+        dev.name = "default.qubit"
         @qml.qnode(dev)
         def qnn(inputs,weights):
             self.model(inputs, weights)
@@ -118,9 +132,8 @@ class qnn_compiler():
     
 
     def probabilites(self):
-        dev = qml.device("default.qubit.jax", wires=self.n_features)
 
-        @qml.qnode(dev,interface='jax')
+        @qml.qnode(self.dev,interface='jax')
         def qnn(inputs,weights):
             self.model(inputs, weights)
             return qml.probs(wires=[i for i in range(self.n_features)])
