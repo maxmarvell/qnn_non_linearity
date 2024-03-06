@@ -18,3 +18,5 @@ venv/
 non_linear/example.py
 plot_fourier_coefficents.py
 plot_fisher_information.py
+plot_quantum_fisher.py
+plot_quanvolutional.py
