@@ -9,73 +9,137 @@ from non_linear.models import qnn_compiler
 # Defining a class that computes fisher information given a quantum model
 class FisherInformation():
 
-  def __init__(self, model:any, n_features:int, n_layers:int):
+    def __init__(self, model:qnn_compiler):
 
-    '''
-      n_features: Number of features of the input data
-      n_layers: Number of parametrised layers of the pqc
-      n_samples: Number of samples of the input data
-    '''
+        '''
+            initializes a class that can compute classical fisher information in a batched or
+            non-batched fashion
 
-    # initailise the quantum state and return the parameter shape
-    compiler = qnn_compiler(model, n_features, n_layers, 1)
-    self.parameter_shape = compiler.parameter_shape
-    self.qnn = compiler.probabilites()
-    self.n_features = n_features
+            args:
+                qnn_compiler: comiler to create the variational quantum circuit model
+        '''
 
-  # this needs to batched here as value_and_grad cannot handle batched output
-  @partial(jax.jit, static_argnums=(0,))
-  def get_grads(self, inputs: np.ndarray, params: np.ndarray, i):
-    return jax.value_and_grad(lambda theta: self.qnn(inputs, theta.reshape(self.parameter_shape))[i])(params.reshape(-1))
+        # extract parameter shape
+        self.parameter_shape = model.parameter_shape
 
-  # batching the gradient computation of each probability output
-  def get_fisher(self, inputs:np.ndarray, params:np.ndarray):
-    grads_batched = jax.vmap(self.get_grads, (None, None, 0))
-    get_grads = jax.jit(grads_batched)
-    values, grads = get_grads(inputs, params, self.probability_index)
-    return values, grads
+        # initailise the quantum circuit for state measurement
+        self.qnn = model.probabilites()
+        
+        # extract useful params for fidelity calcs
+        self.n_features = self.parameter_shape[-2]
 
-  # computing the FIM for each sample input
-  def sample_fishers(self, n_samples:int = 100):
+        # utility index for batching gradient calcs
+        self.batch_index = np.array([i for i in range(self.n_features**2)])
 
-    # random inputs
-    self.inputs = np.random.normal(0, 1, (n_samples, self.n_features,))
+    @partial(jax.jit, static_argnums=(0,))
+    def get_gradient(self, inputs:ndarray, params:ndarray, i:int):
+        '''
+            function to compute a partial gradient of a single bitstring outcome probability
 
-    # indexes to batch with
-    self.probability_index = np.array([i for i in range(self.n_features**2)])
+            args:
+                inputs: a numpy array containing one sample
+                params: a numpy array containing a single parametrisation of the qnn
+                i: the index of the bitstring outcompe we want to compute the probability gradient
+        '''
+        return jax.value_and_grad(lambda theta: self.qnn(inputs, theta.reshape(self.parameter_shape))[i])(params.reshape(-1))
 
-    # random initial parameters - but same for each sample
-    self.params = np.tile(jax.random.uniform(jax.random.PRNGKey(10), shape=self.parameter_shape), (n_samples, 1, 1, 1))
+    @partial(jax.jit, static_argnums=(0,))
+    def batched_gradient(self, inputs:ndarray, params:ndarray):
+        
+        '''
+            function to batch the gradient compute over all the possible bitstring outcomes, there are 2^(n_features) possible states
 
-    # batch the fishers
-    fishers_batched = jax.vmap(self.get_fisher)
-    fisher = jax.jit(fishers_batched)
-    value, grad = fisher(self.inputs, self.params)
+            args:
+                inputs: a numpy array containing one sample
+                params: a numpy array containing a single parametrisation of the qnn
+        '''
 
-    # init fisher information matrix and eigenvalues
-    fishers = np.zeros(shape=(n_samples, np.product(self.parameter_shape), np.product(self.parameter_shape)))
-    e = np.array([])
+        batched = jax.vmap(self.get_gradient, (None, None, 0))
+        get_gradient = jax.jit(batched)
+        values, grads = get_gradient(inputs, params, self.batch_index)
+        return values, grads
+  
+    def fisher_information(self, inputs:ndarray, params:ndarray):
 
-    # loop over all samples
-    for i in range(n_samples):
-      fishers[i] = np.sum(np.outer(grad[i,j],grad[i,j])/value[i,j] for j in self.probability_index)
-      e = np.append(e, np.linalg.eigvals(fishers[i]))
+        '''
+            function that interfaces the batched gradient to compute a single fisher information instance
 
-    # assign fisher information matrices and eigenvalues
-    self.fishers = fishers
-    self.e = e
+            args:
+                inputs: a numpy array containing one sample
+                params: a numpy array containing a single parametrisation of the qnn
+        '''
 
-    return fishers, e
+        x = self.batched_gradient(inputs, params)
 
-  def plot_eigenvalue_distribution(self, show:bool = None, ax = None):
+        result_shape = jax.core.ShapedArray((params.reshape(-1).shape[0], params.reshape(-1).shape[0], ), inputs.dtype)
 
-    # if no array of axes provided set a default
-    if ax == None: 
-        fig, ax = plt.subplots(1, 1, figsize=(4,8))
-        plt.tight_layout(pad=0.5)
+        @jax.jit
+        def f(x):
+            value, grad = x
+            np.sum(np.outer(grad[j],grad[j])/value[j] for j in self.batch_index)
 
-    ax.boxplot(self.e)
+        fisher = jax.pure_callback(f, result_shape, x)
 
-    if show: plt.show()
+        eigenvalue_shape = jax.core.ShapedArray((params.reshape(-1).shape[0],), inputs.dtype)
 
-    if ax == None: return fig, ax
+        @jax.jit
+        def g(x):
+            np.linalg.eigvals(x)
+
+        e = jax.pure_callback(f, result_shape, fisher)
+        
+        return fisher, e
+    
+    def batched_fisher_information(self, inputs:ndarray, params:ndarray):
+
+        '''
+            function that batches over self.fisher_information to compute the matrix for many samples
+
+            args:
+                inputs: a numpy array containing many samples
+                params: a numpy array containing a single parametrisation of the qnn
+        '''
+
+        batched  = jax.vmap(self.fisher_information, (None, 0))
+        fisher = jax.jit(batched)
+        return fisher(inputs, params)
+
+
+    def sample_fisher_information_matrix(self, n_samples:int = 100):
+
+        '''
+            function that takes n samples of the fisher information of the model
+
+            **kwargs:
+                n_samples: an integer representing the number of samples to take
+        '''
+
+        # random inputs
+        self.inputs = np.random.normal(0, 1, (n_samples, self.n_features,))
+
+        # random initial parameters - but same for each sample
+        self.params = jax.random.uniform(jax.random.PRNGKey(10), shape=self.parameter_shape)
+
+        # batch the fishers
+        batched = jax.vmap(self.batched_gradient, (0, None,))
+        fishers = jax.jit(batched)
+        value, grad = fishers(self.inputs, self.params)
+
+        # process all the samples
+        res = fishers(self.inputs, self.params)
+        self.fisher_matrices, self.eigenvalues = res
+
+        return res
+
+    def plot_eigenvalue_distribution(self, show:bool = None, ax = None):
+
+        # if no array of axes provided set a default
+        if ax == None: 
+            fig, ax = plt.subplots(1, 1, figsize=(4,8))
+            plt.tight_layout(pad=0.5)
+
+        ax.boxplot(self.eigenvalues)
+
+        if show: plt.show()
+
+        if ax == None: return fig, ax
