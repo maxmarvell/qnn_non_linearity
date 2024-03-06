@@ -3,6 +3,8 @@
 ## Overview
 This repository was created to experiment in creating non-linearities with a quantum neural network (QNN). The current body of literature suggests that a model apt to run on near term quantum devices, Noisy Intermediate-Scale Quantum (NISQ) devices, are a family of hybrid classical quantum models known as variational quantum models or variational quantum circuits (VQCs). It follows that a relevent analysis of the current prospects of QNNs should look primarily to these types of models; despite the recent advancements in developing a fully-quantum perceptron model using approximations of non-linear activation functions [Maronese, M. 2019](https://rdcu.be/dAbUc). 
 
+We started by looking at a variety of different models to implement a variational circuit. This included a mitzvah measurement circuit a? regular non 
+
 The contents of this repository follow as:
 
 1. A repository ```non_linear``` containing all source code used to generate data for this project
@@ -59,3 +61,4 @@ With Convolutional network simple ansatz and data reupload
 Sample Fisher Information eigenvalue distributions
 
 ![Eigenvalue distribution of classical fisher information matrix](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classical_fisher/compare_VQC_models.svg?raw=true)
+
