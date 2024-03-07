@@ -80,26 +80,42 @@ N_LAYERS = 5
 # get and encode the make moons data set
 data, target = make_moons(n_samples=N_SAMPLES,noise=NOISE)
 
+# encode data
 scalerOHE = OneHotEncoder(sparse_output=False)
 encoded_target = scalerOHE.fit_transform(target.reshape(-1,1))
   
+# encode target
 sScaler = StandardScaler()
 encoded_data = sScaler.fit_transform(data)
 
+# enhance feature space
 autoencoder = Autoencoder(encoded_data, N_FEATURES)
-encoded_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
+enhanced_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
 
 # train the model
-classifier = ClassifierQNN(models.simple_ansatz, encoded_data, encoded_target, N_LAYERS)
-classifier.train_test_split()
-classifier.learn_model(epochs=100)
+simple_ansatz = ClassifierQNN(models.simple_ansatz, enhanced_data, encoded_target, N_LAYERS)
+simple_ansatz.train_test_split()
 
-# score the model and plot the fit
-classifer.score_model()
-
-classifier.plot_fit
+# score the model
+simple_ansatz.learn_model(epochs=100)
+simple_ansatz.score_model()
+fig = simple_ansatz.plot_fit(show=True, decoded_data=encoded_data)
 
 ```
+
+The resulting accuracy and cross entropy loss is...
+
+```
+Cross entropy loss on training set: 0.5174663662910461
+Accuracy of fullmodel on training set: 0.83
+
+Cross entropy loss on test set: 0.5136251449584961
+Accuracy of fullmodel on test set: 0.85
+```
+
+Hmm a bit dissapointing... how does the classifier look graphically
+
+![Fourier Coefficents sampling on elementary VQC models](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/simple_ansatz/layers=3&epochs=100.svg?raw=true)
 
 
 
