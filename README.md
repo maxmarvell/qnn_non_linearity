@@ -5,7 +5,9 @@ This repository was created to experiment in creating non-linearities with a qua
 
 The end goal of the project is to find a variational quantum model that injects sufficent non-linearities into the system such that the quantum nural network can be assumed a 'universal function approximator'. We started by implementing a variety of different variational circuit models. The purpose of which was to evaluate which model introduced the most non-linear dynamics. In a hybrid classical-quantum circuit the non-linearites are introduced to the system in the measurement phase of the operation. The reasoning behind this is simple, quantum mechanics is fundamentally a composition of linear maps whereas the measurement phase is an inherently non-linear transformation as it is a collapse of superimposed states. 
 
-The standard practice for measurement based quantum computing dictates that measurement are delayed until the end of the computation. As we move to more modern NISQ devices the possibility of mid-circuit measurements has been explored and has already had great theoretical success in quantum error correction. So one thing that was important to investigate is whether mid-circuit measurement would prove appropriate. Other things necessary to verify was whether a uniform repeated ansatz structure made a difference, finally whether it matters if the data is reuploaded to the model.
+The standard practice for measurement based quantum computing dictates that measurement are delayed until the end of the computation. As we move to more modern NISQ devices the possibility of mid-circuit measurements has been explored and has already had great theoretical success in quantum error correction. So one thing that was important to investigate is whether mid-circuit measurement would prove appropriate. Other things necessary to verify was whether a uniform repeated ansatz structure made a difference, finally whether it matters if the data is reuploaded to the model. 
+
+Finally the elementary models were fed into a convolutional model where classical non-linear activation functions can be applied to evaluate whether each model benifitted from non-linearites **known** to inject non-linearities. This is one of the proxies we will be using to test whether the model is sufficiently non-linear.
 
 The contents of this repository follow as:
 
@@ -27,23 +29,30 @@ The contents of this repository follow as:
 
 2. A repository ```graphs``` containing all of the graphs generated and used for this project
 
-## Background
-
-## Usage
-How to use the Library
-```
-from non_linear import models
-from non_linear.autoencoder import Autoencoder
-from non_linear.classifier import ClassifierQNN
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.datasets import make_moons
-import torch
-```
-
-![Sample image of a classification class using the data reuploading](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/data_reupload/sample.svg?raw=true)
-
-
 ## Results and Discussion
+
+Lets begin by running a simple variational circuit with no data-reuploading and simple ansatz structure for a single sample. Here we will suggest that the model has a feature space of size 4, a target space of size 2 (binary classification), and the ansatz repeats 5 times.
+
+```
+from non_linear import models, qnn_compiler
+
+N_FEATURES = 4
+N_TARGETS = 2
+N_LAYERS = 5
+
+<!-- init the compiler -->
+compiler = qnn_compiler(models.simple_ansatz, N_FEATURES, N_LAYERS, N_TARGETS)
+
+<!-- this model is for classification -->
+qnn = compiler.classification()
+
+input = [.1,.2,.3,.4]
+params = jax.random.uniform(jax.random.PRNGKey(0), shape=compiler.parameter_shape)
+
+<!-- this will yield an array of shape (2,) which can be used to classify the inpu -->
+output = qnn(input, params)
+```
+
 
 
 
