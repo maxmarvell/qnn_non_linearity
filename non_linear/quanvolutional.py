@@ -141,12 +141,17 @@ class QCNN():
 
             # logic to compute fisher information for given layer where true
             if self.compute_metrics:
+
                 fisher = FisherInformation(compiler)
-                fisher.fisher_information_matrix = fisher.batched_fisher_information(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                batched = jax.vmap(fisher.fisher_information, (None, 0))
+                res = jax.jit(batched)(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                fisher.fisher_information_matrix, fisher.fisher_eigenvalues = res
                 new_node.fisher_information = fisher
 
                 qfisher = QuantumFisherInformation(compiler)
-                qfisher.quantum_fisher_information_matrix = qfisher.batched_quantum_fisher_information(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                batched = jax.vmap(fisher.fisher_information, (None, 0))
+                res = jax.jit(batched)(inputs, params[depth:depth+num_params].reshape(parameter_shape))
+                qfisher.quantum_fisher_information_matrix, qfisher.quantum_eigenvalues = res
                 new_node.quantum_fisher_information = qfisher
 
 
@@ -222,7 +227,7 @@ class QCNN():
             train the model to obtain a final fit params
         '''
         
-        self.optimizer = optax.adam(learning_rate=0.04)
+        self.optimizer = optax.adam(learning_rate=0.001)
         
         # seed
         key = jax.random.PRNGKey(seed)
@@ -238,7 +243,6 @@ class QCNN():
         self.training_data = [NNLinkedList() for _ in range(epochs // 25)]
 
         self.compute_metrics=False
-
 
         ##### FIT #####
         for epoch in range(epochs):

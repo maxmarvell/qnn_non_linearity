@@ -1,6 +1,7 @@
 from itertools import product
 from functools import partial
 import jax
+import jax.numpy as jnp
 import pennylane as qml
 from pennylane import numpy as np
 import matplotlib.pyplot as plt
@@ -69,33 +70,51 @@ class QuantumFisherInformation():
     def quantum_fisher_information(self, inputs, params):
 
         # using itertools to get all permutations and vmap the calculation of QFI
-        indexes = np.array(list(product(range(np.prod(self.parameter_shape)), repeat=2)))
+        indexes = jnp.array(list(product(range(np.prod(self.parameter_shape)), repeat=2)))
 
         # batch the fidelity count
         batched = jax.vmap(self.compute_fidelity, (None, None, 0))
-        fidelities = jax.jit(batched)
-
-        # evaluate the quantum fisher information
-        fisher = fidelities(inputs.reshape(-1), params.reshape(-1), indexes).reshape(np.prod(self.parameter_shape),np.prod(self.parameter_shape))
+        fisher_matrix = jax.jit(batched)(inputs.reshape(-1), params.reshape(-1), indexes).reshape(np.prod(self.parameter_shape),np.prod(self.parameter_shape))
 
         # expected shape of eigenvalues
-        result_shape = jax.core.ShapedArray((params.reshape(-1).shape[0],), inputs.dtype)
+        result_shape = jax.core.ShapedArray((params.reshape(-1).shape[0],), 'float32')
 
         # function for pure callback
         @jax.jit
         def f(x):
-            np.linalg.eigvals(x)
+            jnp.linalg.eigvals(x)
 
-        e = jax.pure_callback(f, result_shape, fisher)
+        # yield eigenvalues
+        e = jax.pure_callback(f, result_shape, fisher_matrix)
 
-        return fisher, e
+        return fisher_matrix, e
   
 
     @partial(jax.jit, static_argnums=(0,))
     def batched_quantum_fisher_information(self, inputs, params):
-        batched = jax.vmap(self.quantum_fisher_information, (None, 0))
-        qfisher = jax.jit(batched)
-        return qfisher(inputs, params)
+
+        # using itertools to get all permutations and vmap the calculation of QFI
+        indexes = jnp.array(list(product(range(np.prod(self.parameter_shape)), repeat=2)))
+
+        batched_gradients = jax.vmap(self.compute_fidelity, (None, None, 0))
+        f = lambda inputs, params: batched_gradients(inputs, params, indexes).reshape(np.prod(self.parameter_shape),np.prod(self.parameter_shape))
+
+        batched = jax.vmap(f, (0, None))
+        quantum_fisher_matrices = jax.jit(batched)(inputs, params)
+
+        # expected shape of eigenvalues
+        result_shape = jax.core.ShapedArray((params.reshape(-1).shape[0],), 'float32')
+
+        # function for pure callback
+        @jax.jit
+        def f(x):
+            jnp.linalg.eigvals(x)
+
+        eigenvalues = jnp.empty(shape=(inputs.shape[0],np.prod(self.parameter_shape),))
+        for i in range(inputs.shape[0]):
+            eigenvalues = eigenvalues.at[i].set(jnp.linalg.eigvals(quantum_fisher_matrices[i]))
+
+        return quantum_fisher_matrices, eigenvalues
 
 
     @partial(jax.jit, static_argnums=(0,))

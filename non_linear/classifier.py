@@ -74,14 +74,15 @@ class ClassifierQNN():
     @partial(jax.jit, static_argnums=(0,))
     def calculate_ce_cost(self, X, y, theta):
 
-        # Get the target prediction
-        yp = self.qnn(X, theta)
+        # get prediction
+        yp = jnp.array(self.qnn(X, theta)).reshape(-1, self.target_length)
 
-        # Softmax the output
+        # softmax the output
         yp = jax.nn.softmax(yp)
 
-        # Compute loss metric between prediction and real
+        # compute loss metric between prediction and real
         cost = self.cross_entropy_loss(y, yp)
+
         return cost
 
     @partial(jax.jit, static_argnums=(0,))
@@ -94,20 +95,20 @@ class ClassifierQNN():
 
     def learn_model(self, epochs: int, seed: int = random.randrange(1000)):
 
-        self.optimizer = optax.adam(learning_rate=0.04)
+        self.optimizer = optax.adam(learning_rate=0.001)
 
-        # Seed
+        # set seed
         key = jax.random.PRNGKey(seed)
 
-        # Initialize circuit params
+        # initialize circuit params
         initial_params = jax.random.normal(key, shape=self.parameter_shape)
         params = jnp.copy(initial_params)
 
-        # Initialize optimizer
+        # initialize optimizer
         opt_state = self.optimizer.init(initial_params)
 
         # init empty list to store fishers, qfishers, etc
-        self.training_data = np.empty((epoch // 25, ))
+        self.training_data = []
 
         ##### FIT #####
         for epoch in range(epochs):
@@ -120,20 +121,23 @@ class ClassifierQNN():
                 i = epoch // 25
 
                 fisher = FisherInformation(self.compiler)
-                fisher.fisher_information_matrix = fisher.batched_fisher_information(self.X_train, params)
+                fisher.fisher_information_matrix, fisher.fisher_eigenvalues = fisher.batched_fisher_information(self.X_train, params)
 
                 qfisher = QuantumFisherInformation(self.compiler)
-                qfisher.quantum_fisher_information_matrix = qfisher.batched_quantum_fisher_information(self.X_train, params)
+                qfisher.quantum_fisher_information_matrix, qfisher.quantum_fisher_eigenvalues = qfisher.batched_quantum_fisher_information(self.X_train, params)
+
 
                 y_pred = self.qnn(self.data, params)
-                
-                self.training_data[i] = LearnModelData(
-                    fisher_information=fisher, 
+
+                data = LearnModelData(
                     quantum_fisher_information=qfisher,
+                    fisher_information=fisher,
                     y_pred=y_pred
                 )
+                
+                self.training_data.append(data)
 
-        # Store trained parameters
+        # store trained parameters
         self.fit_params = params
 
 

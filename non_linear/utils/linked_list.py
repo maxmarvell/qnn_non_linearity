@@ -12,8 +12,6 @@ class LearnModelData:
         self.quantum_fisher_information = quantum_fisher_information
         self.y_pred = y_pred
 
-
-
 class Node(LearnModelData):
     def __init__(self, layer):
         self.layer = layer
