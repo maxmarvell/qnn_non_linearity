@@ -60,8 +60,47 @@ Here is the result:
 output = [Array(0.44702205, dtype=float32), Array(0.09808806, dtype=float32)]
 ```
 
-Of course these results are completely arbitrary and mean nothing, just that the quantum model produced an output
-Now that we have the basis for how this will work for a single input we can do more advanced things like training the model on a standardised library, like **make_moons**. We chose make
+Of course these results are completely arbitrary and mean nothing, just that the quantum model produced an output. With this groundwork, however, we can now begin to train the model parameters and see if the model can actually handle a standardised non-linear classifcation task, here we use the make_moons library. As standard we will enhance the feature space of the make_moons library to 4 features, by using an autoencoder, then decode the results where necessary. Here is an example of training a VQC with a simple ansatz structure:
+
+```
+from non_linear.models import simple_ansatz
+from non_linear.autoencoder import Autoencoder
+from non_linear.classifier import ClassifierQNN
+from sklearn.datasets import make_moons
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import torch
+import jax
+
+NOISE = .2
+EPOCHS = 100
+N_SAMPLES = 500
+N_FEATURES = 4
+N_LAYERS = 5
+
+# get and encode the make moons data set
+data, target = make_moons(n_samples=N_SAMPLES,noise=NOISE)
+
+scalerOHE = OneHotEncoder(sparse_output=False)
+encoded_target = scalerOHE.fit_transform(target.reshape(-1,1))
+  
+sScaler = StandardScaler()
+encoded_data = sScaler.fit_transform(data)
+
+autoencoder = Autoencoder(encoded_data, N_FEATURES)
+encoded_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
+
+# train the model
+classifier = ClassifierQNN(models.simple_ansatz, encoded_data, encoded_target, N_LAYERS)
+classifier.train_test_split()
+classifier.learn_model(epochs=100)
+
+# score the model and plot the fit
+classifer.score_model()
+
+classifier.plot_fit
+
+```
+
 
 
 
