@@ -34,26 +34,34 @@ The contents of this repository follow as:
 Lets begin by running a simple variational circuit with no data-reuploading and simple ansatz structure for a single sample. Here we will suggest that the model has a feature space of size 4, a target space of size 2 (binary classification), and the ansatz repeats 5 times.
 
 ```
-from non_linear import models, qnn_compiler
+from non_linear.models import qnn_compiler, simple_ansatz
+import jax
 
 N_FEATURES = 4
 N_TARGETS = 2
 N_LAYERS = 5
 
-<!-- init the compiler -->
-compiler = qnn_compiler(models.simple_ansatz, N_FEATURES, N_LAYERS, N_TARGETS)
+# init the compiler
+compiler = qnn_compiler(simple_ansatz, N_FEATURES, N_LAYERS, N_TARGETS)
 
-<!-- this model is for classification -->
+# this model is for classification
 qnn = compiler.classification()
 
 input = [.1,.2,.3,.4]
 params = jax.random.uniform(jax.random.PRNGKey(0), shape=compiler.parameter_shape)
 
-<!-- this will yield an array of shape (2,) which can be used to classify the inpu -->
+# this will yield an array of shape (2,) which can be used to classify the input
 output = qnn(input, params)
 ```
 
+Here is the result:
 
+```
+output = [Array(0.44702205, dtype=float32), Array(0.09808806, dtype=float32)]
+```
+
+Of course these results are completely arbitrary and mean nothing, just that the quantum model produced an output
+Now that we have the basis for how this will work for a single input we can do more advanced things like training the model on a standardised library, like **make_moons**. We chose make
 
 
 
