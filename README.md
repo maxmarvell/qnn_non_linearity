@@ -3,7 +3,9 @@
 ## Overview
 This repository was created to experiment in creating non-linearities with a quantum neural network (QNN). The current body of literature suggests that a model apt to run on near term quantum devices, Noisy Intermediate-Scale Quantum (NISQ) devices, are a family of hybrid classical quantum models known as variational quantum models or variational quantum circuits (VQCs). It follows that a relevent analysis of the current prospects of QNNs should look primarily to these types of models; despite the recent advancements in developing a fully-quantum perceptron model using approximations of non-linear activation functions [Maronese, M. 2019](https://rdcu.be/dAbUc). 
 
-We started by looking at a variety of different models to implement a variational circuit. This included a mitzvah measurement circuit a? regular non 
+The end goal of the project is to find a variational quantum model that injects sufficent non-linearities into the system such that the quantum nural network can be assumed a 'universal function approximator'. We started by implementing a variety of different variational circuit models. The purpose of which was to evaluate which model introduced the most non-linear dynamics. In a hybrid classical-quantum circuit the non-linearites are introduced to the system in the measurement phase of the operation. The reasoning behind this is simple, quantum mechanics is fundamentally a composition of linear maps whereas the measurement phase is an inherently non-linear transformation as it is a collapse of superimposed states. 
+
+The standard practice for measurement based quantum computing dictates that measurement are delayed until the end of the computation. As we move to more modern NISQ devices the possibility of mid-circuit measurements has been explored and has already had great theoretical success in quantum error correction. So one thing that was important to investigate is whether mid-circuit measurement would prove appropriate. Other things necessary to verify was whether a uniform repeated ansatz structure made a difference, finally whether it matters if the data is reuploaded to the model.
 
 The contents of this repository follow as:
 
@@ -42,6 +44,9 @@ import torch
 
 
 ## Results and Discussion
+
+
+
 
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 
