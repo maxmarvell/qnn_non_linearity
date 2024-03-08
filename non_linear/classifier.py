@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import jax
 import optax
 import random
+import torch
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -20,6 +21,9 @@ from non_linear.fisher import FisherInformation
 from non_linear.qfisher import QuantumFisherInformation
 
 from non_linear.utils.linked_list import NNLinkedList, LearnModelData
+from non_linear.autoencoder import Autoencoder
+
+from numpy import ndarray
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -58,7 +62,8 @@ class ClassifierQNN():
                 test_size: the proporion of samples that should be assigned to the test
         '''
 
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data, self.target, test_size=0.20, random_state=42)
+        self.test_size = test_size
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data, self.target, test_size=test_size, random_state=42)
         return self.X_train, self.X_test, self.y_train, self.y_test
 
 
@@ -75,7 +80,7 @@ class ClassifierQNN():
     def calculate_ce_cost(self, X, y, theta):
 
         # get prediction
-        yp = jnp.array(self.qnn(X, theta)).reshape(-1, self.target_length)
+        yp = jnp.array(self.qnn(X, theta)).T
 
         # softmax the output
         yp = jax.nn.softmax(yp)
@@ -93,9 +98,13 @@ class ClassifierQNN():
         return params, opt_state, loss
 
 
-    def learn_model(self, epochs: int, seed: int = random.randrange(1000)):
+    def learn_model(self, 
+                    epochs: int, 
+                    seed: int = random.randrange(1000), 
+                    lr:float = 0.04,
+                    save_data:bool = False):
 
-        self.optimizer = optax.adam(learning_rate=0.001)
+        self.optimizer = optax.adam(learning_rate=lr)
 
         # set seed
         key = jax.random.PRNGKey(seed)
@@ -116,7 +125,7 @@ class ClassifierQNN():
             if epoch % 5 == 0:
                 print(f'epoch: {epoch}\t cost: {cost}')
 
-            if epoch % 25 == 0:
+            if (epoch % 25 == 0 and save_data):
 
                 i = epoch // 25
 
@@ -144,7 +153,7 @@ class ClassifierQNN():
     def score_model(self):
 
         # Evaluate the cross entropy loss on the training set
-        yp = self.qnn(self.X_train, self.fit_params)
+        yp = jnp.array(self.qnn(self.X_train, self.fit_params)).T
         yp = jax.nn.softmax(yp)
         print(f'\nCross entropy loss on training set: {self.cross_entropy_loss(self.y_train,yp)}')
 
@@ -153,7 +162,7 @@ class ClassifierQNN():
         print(f'Accuracy of fullmodel on training set: {accuracy_score(jnp.argmax(self.y_train,axis=1),yp)}\n')
 
         # Evaluate the Cross Entropy Loss on the testing set
-        yp = self.qnn(self.X_test, self.fit_params)
+        yp = jnp.array(self.qnn(self.X_test, self.fit_params)).T
         yp = jax.nn.softmax(yp)
         print(f'\nCross entropy loss on test set: {self.cross_entropy_loss(self.y_test,yp)}')
 
@@ -162,7 +171,7 @@ class ClassifierQNN():
         print(f'Accuracy of fullmodel on test set: {accuracy_score(jnp.argmax(self.y_test,axis=1),yp)}\n')
 
 
-    def plot_fit(self):
+    def plot_fit(self, decoded_data:ndarray = None, show:bool = False):
 
         figure = plt.figure()
         cm = plt.cm.RdBu
@@ -177,15 +186,22 @@ class ClassifierQNN():
         plt.xlabel("x", size=14, fontname="Times New Roman", labelpad=10)
         plt.ylabel("y", size=14, fontname="Times New Roman", labelpad=10)
 
+        # decode where necessary
+        if type(decoded_data) == ndarray:
+            X_train, X_test, _, _ = train_test_split(decoded_data, self.target, test_size=self.test_size, random_state=42)
+        else:
+            X_test = self.X_test
+            X_train = self.X_train
+
         # Apply final params to test set
-        yp_test = self.qnn(self.X_test, self.fit_params)
+        yp_test = jnp.array(self.qnn(self.X_test, self.fit_params)).T
         yp_test = jax.nn.softmax(yp_test)
         yp_test = jnp.argmax(yp_test, axis=1)
 
         # Plot the testing points
         ax.scatter(
-            self.X_test[:, 0],
-            self.X_test[:, 1],
+            X_test[:, 0],
+            X_test[:, 1],
             c=yp_test,
             cmap=cm_bright,
             edgecolors="k",
@@ -193,14 +209,14 @@ class ClassifierQNN():
         )
 
         # Apply final params to test set
-        yp_train = self.qnn(self.X_train, self.fit_params)
+        yp_train = jnp.array(self.qnn(self.X_train, self.fit_params)).T
         yp_train = jax.nn.softmax(yp_train)
         yp_train = jnp.argmax(yp_train, axis=1)
 
         # Plot the testing points
         ax.scatter(
-            self.X_train[:, 0],
-            self.X_train[:, 1],
+            X_train[:, 0],
+            X_train[:, 1],
             c=yp_train,
             cmap=cm_bright,
             edgecolors="k",
@@ -212,8 +228,8 @@ class ClassifierQNN():
         args = jnp.argwhere(errors != 0)
         
         ax.scatter(
-            self.X_test[args, 0],
-            self.X_test[args, 1],
+            X_test[args, 0],
+            X_test[args, 1],
             edgecolors="c",
             linewidths=1.8,
             s=120, 
@@ -224,8 +240,8 @@ class ClassifierQNN():
         args = jnp.argwhere(errors != 0)
         
         ax.scatter(
-            self.X_train[args, 0],
-            self.X_train[args, 1],
+            X_train[args, 0],
+            X_train[args, 1],
             edgecolors="c",
             linewidths=1.8,
             s=120, 
@@ -233,6 +249,8 @@ class ClassifierQNN():
         )
         
         plt.grid()
+
+        if show: plt.show()
 
         return figure
     

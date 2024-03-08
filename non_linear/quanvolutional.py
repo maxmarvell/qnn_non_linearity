@@ -63,9 +63,11 @@ class QCNN():
         # build out parameter shape for the convolutional network
         for i, v in enumerate(self.nn_layers):
             if i == 0:
-                param_shape = qml.StronglyEntanglingLayers.shape(n_layers=self.n_layers, n_wires=self.n_features)
+                compiler = qnn_compiler(model, self.n_features, n_layers, 1)
+                param_shape = compiler.parameter_shape
             else:
-                param_shape = qml.StronglyEntanglingLayers.shape(n_layers=self.n_layers, n_wires=self.nn_layers[i-1])
+                compiler = qnn_compiler(model, self.nn_layers[i-1], n_layers, 1)
+                param_shape = compiler.parameter_shape
                 
             if method == "ACAF":
                 count += v
@@ -85,7 +87,7 @@ class QCNN():
             **kwargs:
                 test_size: the proporion of samples that should be assigned to the test
         '''
-
+        self.test_size = test_size
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data, self.target, test_size=test_size, random_state=42)
         return self.X_train, self.X_test, self.y_train, self.y_test
 
@@ -167,7 +169,7 @@ class QCNN():
 
             # conditionally apply classical activation function
             if self.method == "ACAF":
-                inputs = (1 / (1 + jnp.exp(-inputs))) * params[depth:depth+layer]
+                inputs = (1 / (1 + jnp.exp(-jnp.array(inputs)))) * params[depth:depth+layer]
                 depth += layer
             
         return inputs
@@ -200,10 +202,10 @@ class QCNN():
     @partial(jax.jit, static_argnums=(0,))
     def calculate_ce_cost(self, X, y, theta):
 
-        batched = jnp.array(self.batched_forward_pass(X, theta))
-
         # Get the target prediction
-        yp = batched.reshape(-1, self.target_length)
+        yp = jnp.array(self.batched_forward_pass(X, theta))[:,:,0]
+
+        if yp.shape[0] == self.target_length: yp = yp.T
 
         # Softmax the output
         yp = jax.nn.softmax(yp)
@@ -221,13 +223,17 @@ class QCNN():
         return params, opt_state, loss
     
     
-    def learn_model(self, epochs: int, seed: int = random.randrange(1000)):
+    def learn_model(self, 
+                    epochs:int, 
+                    seed:int = random.randrange(1000),
+                    lr:float = 0.04,
+                    save_data:bool = False):
 
         '''
             train the model to obtain a final fit params
         '''
         
-        self.optimizer = optax.adam(learning_rate=0.001)
+        self.optimizer = optax.adam(learning_rate=lr)
         
         # seed
         key = jax.random.PRNGKey(seed)
@@ -251,7 +257,7 @@ class QCNN():
             if epoch % 5 == 0:
                 print(f'epoch: {epoch}\t cost: {cost}')
 
-            if epoch % 25 == 0:
+            if (epoch % 25 == 0 and save_data):
                 i = epoch // 25
                 self.compute_metrics=True
                 self.batched_forward_pass(self.X_train, params, compute_metrics=True)
@@ -264,17 +270,19 @@ class QCNN():
        
     def score_model(self):
 
-        # Evaluate the cross entropy loss on the training set
-        yp = self.batched(self.X_train, self.fit_params).reshape(-1, self.target_length)
+        # evaluate the cross entropy loss on the training set
+        yp = jnp.array(self.batched_forward_pass(self.X_train, self.fit_params))[:,:,0]
+        if yp.shape[0] == self.target_length: yp = yp.T
         yp = jax.nn.softmax(yp)
         print(f'\nCross entropy loss on training set: {self.cross_entropy_loss(self.y_train,yp)}')
 
-        # Evaluate the accuracy on the training set
+        # evaluate the accuracy on the training set
         yp = jnp.argmax(yp, axis=1)
         print(f'Accuracy of fullmodel on training set: {accuracy_score(jnp.argmax(self.y_train,axis=1),yp)}\n')
 
         # Evaluate the Cross Entropy Loss on the testing set
-        yp = self.batched(self.X_test, self.fit_params).reshape(-1, self.target_length)
+        yp = jnp.array(self.batched_forward_pass(self.X_test, self.fit_params))[:,:,0]
+        if yp.shape[0] == self.target_length: yp = yp.T
         yp = jax.nn.softmax(yp)
         print(f'\nCross entropy loss on test set: {self.cross_entropy_loss(self.y_test,yp)}')
 
@@ -283,7 +291,7 @@ class QCNN():
         print(f'Accuracy of fullmodel on test set: {accuracy_score(jnp.argmax(self.y_test,axis=1),yp)}\n')
 
 
-    def plot_fit(self):
+    def plot_fit(self, decoded_data:ndarray = None, show:bool = False):
         
         figure = plt.figure()
         cm = plt.cm.RdBu
@@ -298,15 +306,23 @@ class QCNN():
         plt.xlabel("x", size=14, fontname="Times New Roman", labelpad=10)
         plt.ylabel("y", size=14, fontname="Times New Roman", labelpad=10)
 
+        # decode where necessary
+        if type(decoded_data) == ndarray:
+            X_train, X_test, _, _ = train_test_split(decoded_data, self.target, test_size=self.test_size, random_state=42)
+        else:
+            X_test = self.X_test
+            X_train = self.X_train
+
         # Apply final params to test set
-        yp_test = self.batched(self.X_test, self.fit_params).reshape(-1, self.target_length)
+        yp_test = jnp.array(self.batched_forward_pass(self.X_test, self.fit_params))[:,:,0]
+        if yp_test.shape[0] == self.target_length: yp_test = yp_test.T
         yp_test = jax.nn.softmax(yp_test)
         yp_test = jnp.argmax(yp_test, axis=1)
 
         # Plot the testing points
         ax.scatter(
-            self.X_test[:, 0],
-            self.X_test[:, 1],
+            X_test[:, 0],
+            X_test[:, 1],
             c=yp_test,
             cmap=cm_bright,
             edgecolors="k",
@@ -314,14 +330,15 @@ class QCNN():
         )
 
         # Apply final params to test set
-        yp_train = self.batched(self.X_train, self.fit_params).reshape(-1, self.target_length)
+        yp_train = jnp.array(self.batched_forward_pass(self.X_train, self.fit_params))[:,:,0]
+        if yp_train.shape[0] == self.target_length: yp_train = yp_train.T
         yp_train = jax.nn.softmax(yp_train)
         yp_train = jnp.argmax(yp_train, axis=1)
 
         # Plot the testing points
         ax.scatter(
-            self.X_train[:, 0],
-            self.X_train[:, 1],
+            X_train[:, 0],
+            X_train[:, 1],
             c=yp_train,
             cmap=cm_bright,
             edgecolors="k",
@@ -333,8 +350,8 @@ class QCNN():
         args = jnp.argwhere(errors != 0)
         
         ax.scatter(
-            self.X_test[args, 0],
-            self.X_test[args, 1],
+            X_test[args, 0],
+            X_test[args, 1],
             edgecolors="c",
             linewidths=1.8,
             s=120, 
@@ -345,8 +362,8 @@ class QCNN():
         args = jnp.argwhere(errors != 0)
         
         ax.scatter(
-            self.X_train[args, 0],
-            self.X_train[args, 1],
+            X_train[args, 0],
+            X_train[args, 1],
             edgecolors="c",
             linewidths=1.8,
             s=120, 
@@ -354,6 +371,8 @@ class QCNN():
         )
         
         plt.grid()
+
+        if show: plt.show()
 
         return figure
     

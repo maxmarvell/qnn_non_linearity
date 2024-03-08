@@ -41,7 +41,6 @@ def variational_ansatz(n_features:int, n_layers:int):
     return model, (n_layers+1,n_features), dev
 
 
-
 def simple_ansatz(n_features:int, n_layers:int):
 
     dev = qml.device("default.qubit.jax", wires=n_features)
@@ -49,10 +48,9 @@ def simple_ansatz(n_features:int, n_layers:int):
     def model(inputs, weights):
         qml.AngleEmbedding(inputs, wires=range(n_features))
         for i in range(n_layers):
-            qml.StronglyEntanglingLayers(weights[i:i+1], wires=range(n_features))
+            qml.BasicEntanglerLayers(weights[i:i+1], wires=range(n_features))
     
-    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features), dev
-
+    return model, qml.BasicEntanglerLayers.shape(n_layers=n_layers, n_wires=n_features), dev
 
 
 def data_reupload(n_features:int, n_layers:int):
@@ -67,8 +65,18 @@ def data_reupload(n_features:int, n_layers:int):
     
     return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features), dev
 
+def strongly_entangling_ansatz(n_features:int, n_layers:int):
 
-### WARNING: DOES NOT WORK DUE TO PENNYLANE VERSION NEEDS < 0.34 ###
+    dev = qml.device("default.qubit.jax", wires=n_features)
+
+    def model(inputs, weights):
+        qml.AngleEmbedding(inputs, wires=range(n_features))
+        for i in range(n_layers):
+            qml.StronglyEntanglingLayers(weights[i:i+1], wires=range(n_features))
+    
+    return model, qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_features), dev
+
+
 def mid_measure(n_features:int, n_layers:int, n_repitions:int):
 
     assert (n_repitions % 2) != 0

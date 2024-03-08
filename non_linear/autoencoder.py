@@ -41,7 +41,7 @@ class Autoencoder(nn.Module):
 
         # Train the model
         batch_size = 16
-        for epoch in range(self.epochs):
+        for epoch in range(epochs):
             loss_tot=0
             for i in range(0, len(data), batch_size):
                 # Get the batch
@@ -60,5 +60,7 @@ class Autoencoder(nn.Module):
             loss_tot=loss_tot/len(data)
             # Print the loss every 10 epochs
             if (epoch+1) % 100 == 0:
-                print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, self.epochs, loss_tot))
+                print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, epochs, loss_tot))
+
+        print("/n")
 

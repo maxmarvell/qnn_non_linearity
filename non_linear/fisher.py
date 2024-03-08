@@ -94,6 +94,7 @@ class FisherInformation():
         
         return fisher_matrix, eigenvalues
     
+    @partial(jax.jit, static_argnums=(0,))
     def batched_fisher_information(self, inputs:ndarray, params:ndarray):
 
         '''

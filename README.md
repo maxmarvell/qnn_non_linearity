@@ -115,7 +115,11 @@ Accuracy of fullmodel on test set: 0.85
 
 Hmm a bit dissapointing... how does the classifier look graphically
 
-![Fourier Coefficents sampling on elementary VQC models](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/simple_ansatz/layers=3&epochs=100.svg?raw=true)
+![classification using simple ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/simple_ansatz/layers=3&epochs=100.svg?raw=true)
+
+Clearly the classifier has just drawn a linear decision boundary to classify the points, this inherently suggests that the model does not suffice...
+
+[Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via angle encoding we also increase the availiable number of trainable fourier coefficents. What does this mean exactly? Well a linear classifier would, theoretically, have access to only one fourier coefficent 
 
 
 
