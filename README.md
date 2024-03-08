@@ -175,7 +175,7 @@ Accuracy of fullmodel on test set: 0.91
 
 ![classification with data reupload](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/data_reupload/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
-![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
+![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2&repititions=5.svg?raw=true)
 
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 
