@@ -122,43 +122,16 @@ It appears that the model is not really learning the classification problem. Rat
 We first tackle the problem of learning, by implementing a more complex entangling structure where the ansatz varies layer by layer we can see whether the model "learns" more effecitvely despite a lack of access to parameters:
 
 ```
-from non_linear.models import simple_ansatz
-from non_linear.autoencoder import Autoencoder
-from non_linear.classifier import ClassifierQNN
-from sklearn.datasets import make_moons
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-import torch
-import jax
-
-NOISE = .2
-EPOCHS = 100
-N_SAMPLES = 500
-N_FEATURES = 4
-N_LAYERS = 5
-
-# get and encode the make moons data set
-data, target = make_moons(n_samples=N_SAMPLES,noise=NOISE)
-
-# encode data
-scalerOHE = OneHotEncoder(sparse_output=False)
-encoded_target = scalerOHE.fit_transform(target.reshape(-1,1))
-  
-# encode target
-sScaler = StandardScaler()
-encoded_data = sScaler.fit_transform(data)
-
-# enhance feature space
-autoencoder = Autoencoder(encoded_data, N_FEATURES)
-enhanced_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
+...as before
 
 # train the model
-strongly_entangled_ansatz = ClassifierQNN(models.strongly_entangled_ansatz, enhanced_data, encoded_target, N_LAYERS)
-strongly_entangled_ansatz.train_test_split()
+classifier = ClassifierQNN(models.strongly_entangled_ansatz, enhanced_data, encoded_target, N_LAYERS)
+classifier.train_test_split()
 
 # score the model
-strongly_entangled_ansatz.learn_model(epochs=100)
-strongly_entangled_ansatz.score_model()
-fig = strongly_entangled_ansatz.plot_fit(show=True, decoded_data=encoded_data)
+classifier.learn_model(epochs=100)
+classifier.score_model()
+fig = classifier.plot_fit(show=True, decoded_data=encoded_data)
 
 ```
 
@@ -174,12 +147,33 @@ Accuracy of fullmodel on test set: 0.91
 
 ![classification using complex ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/strongly_entangling_ansatz/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
-[Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via angle encoding we also increase the availiable number of trainable fourier coefficents. What does this mean exactly? Well a linear classifier would, theoretically, have access to only one fourier coefficent:
+This appears to be better, as the model is actually trying to minimise the number of erros and has some perspective of the classification problem, but clearly the model is limited somehow. This is likely due to a lack of available fourier frequencies, with which to assign fourier coefficents. Naturally a function which can only be decomposed into one fourier frequency lacks the complexity necessary to approximate an arbitrary multivariate function. [Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via our encoding method we also increase fourier frequencies with which our model has access too. As follows:
 
+```
+...as before
 
+# train the model
+classifier = ClassifierQNN(models.data_reupload, enhanced_data, encoded_target, N_LAYERS)
+classifier.train_test_split()
 
+# score the model
+classifier.learn_model(epochs=100)
+classifier.score_model()
+fig = classifier.plot_fit(show=True, decoded_data=encoded_data)
 
+```
 
+The resulting accuracy and cross entropy loss and accuracy is...
+
+```
+Cross entropy loss on training set: 0.32373467087745667
+Accuracy of fullmodel on training set: 0.8975
+
+Cross entropy loss on test set: 0.31316033005714417
+Accuracy of fullmodel on test set: 0.91
+```
+
+![classification using complex ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/data_reupload/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 
@@ -204,3 +198,5 @@ Sample Fisher Information eigenvalue distributions
 ## Outlooks
 
 Beyond the work outlined here, it would be good to apply some noise simulations as we would likely find that larger models such as the mid-circuit measurements would drop off in utility. Moreover we could attempt to implement a quantum model where non-linearites are induced by the open quantum dynamics of a noisy system.
+
+It would also be useful to impelement these models on a more complex learning task to really evaluate effectiveness.
