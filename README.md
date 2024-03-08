@@ -62,6 +62,8 @@ output = [Array(0.44702205, dtype=float32), Array(0.09808806, dtype=float32)]
 
 Of course these results are completely arbitrary and mean nothing, just that the quantum model produced an output. With this groundwork, however, we can now begin to train the model parameters and see if the model can actually handle a standardised non-linear classifcation task, here we use the make_moons library. As standard we will enhance the feature space of the make_moons library to 4 features, by using an autoencoder, then decode the results where necessary. Here is an example of training a VQC with a simple ansatz structure:
 
+![circuit diagram basic entangler](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/basic_entangler.jpg?raw=true)
+
 ```
 from non_linear.models import simple_ansatz
 from non_linear.autoencoder import Autoencoder
@@ -149,6 +151,8 @@ Accuracy of fullmodel on test set: 0.91
 
 This appears to be better, as the model is actually trying to minimise the number of erros and has some perspective of the classification problem, but clearly the model is limited somehow. This is likely due to a lack of available fourier frequencies, with which to assign fourier coefficents. Naturally a function which can only be decomposed into one fourier frequency lacks the complexity necessary to approximate an arbitrary multivariate function. [Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via our encoding method we also increase fourier frequencies with which our model has access too. As follows:
 
+![circuit diagram data reupload](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/data_reupload.jpg?raw=true)
+
 ```
 ...as before
 
@@ -175,9 +179,11 @@ Accuracy of fullmodel on test set: 0.91
 
 ![classification with data reupload](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/data_reupload/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
+![circuit diagram mid measure](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/midmeasure.jpg?raw=true)
+
 ![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2&repititions=5.svg?raw=true)
 
-
+How could we have predicted this type of behaviour? What metrics can we use to score a particular model prior to using it? There are four things we explored in this 
 
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 
