@@ -177,6 +177,8 @@ Accuracy of fullmodel on test set: 0.91
 
 ![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2&repititions=5.svg?raw=true)
 
+
+
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 
 The first follows [Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605), by representing the model a as a fourier series we uncover that the power of the model depends on the coefficents the model has access to control. A model with only a few adjustable fourier coefficents is naturally going to act as a weaker arbitrary function approximator.
