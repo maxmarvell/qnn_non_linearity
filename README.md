@@ -179,7 +179,35 @@ Accuracy of fullmodel on test set: 0.91
 
 ![classification with data reupload](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/data_reupload/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
+This appears effective but by measuring at the end of the quantum circuit we completely break the quantum state, this may make it not very scalable. With modern quantum devices comes the opportunity to perform mid-circuit measurements. This has already proved useful for quantum error correction but can it, surely it would yield similar results?
+
 ![circuit diagram mid measure](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/midmeasure.jpg?raw=true)
+
+```
+...as before
+
+# train the model
+N_REPITIONS = 3
+model = lambda n_features, n_layers: models.mid_measure(n_features, n_layers, N_REPITIONS)
+classifier = ClassifierQNN(model, enhanced_data, encoded_target, N_LAYERS)
+classifier.train_test_split()
+
+# score the model
+classifier.learn_model(epochs=100)
+classifier.score_model()
+fig = classifier.plot_fit(show=True, decoded_data=encoded_data)
+
+```
+
+The resulting accuracy and cross entropy loss and accuracy is...
+
+```
+Cross entropy loss on training set: 0.33603715896606445
+Accuracy of fullmodel on training set: 0.975
+
+Cross entropy loss on test set: 0.36384719610214233
+Accuracy of fullmodel on test set: 0.95
+```
 
 ![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2&repititions=5.svg?raw=true)
 
