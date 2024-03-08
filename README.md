@@ -103,23 +103,80 @@ fig = simple_ansatz.plot_fit(show=True, decoded_data=encoded_data)
 
 ```
 
-The resulting accuracy and cross entropy loss is...
+The resulting accuracy and cross entropy loss and accuracy is...
 
 ```
-Cross entropy loss on training set: 0.5174663662910461
-Accuracy of fullmodel on training set: 0.83
+Cross entropy loss on training set: 0.5583205819129944
+Accuracy of fullmodel on training set: 0.79
 
-Cross entropy loss on test set: 0.5136251449584961
-Accuracy of fullmodel on test set: 0.85
+Cross entropy loss on test set: 0.5652841925621033
+Accuracy of fullmodel on test set: 0.8
 ```
 
 Hmm a bit dissapointing... how does the classifier look graphically
 
-![classification using simple ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/simple_ansatz/layers=3&epochs=100.svg?raw=true)
+![classification using simple ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/simple_ansatz/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
 
-Clearly the classifier has just drawn a linear decision boundary to classify the points, this inherently suggests that the model does not suffice...
+It appears that the model is not really learning the classification problem. Rather it is just drawing arbitrary **linear** decision boundaries. Under the representation of quantum model as a partial fourier series we can draw two conclusions. Firstly, that the model is ill-equipped to train the fourier coefficents of the model and secondly that the circuit may have "access" to sufficent fourier coefficents in the first place.
 
-[Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via angle encoding we also increase the availiable number of trainable fourier coefficents. What does this mean exactly? Well a linear classifier would, theoretically, have access to only one fourier coefficent 
+We first tackle the problem of learning, by implementing a more complex entangling structure where the ansatz varies layer by layer we can see whether the model "learns" more effecitvely despite a lack of access to parameters:
+
+```
+from non_linear.models import simple_ansatz
+from non_linear.autoencoder import Autoencoder
+from non_linear.classifier import ClassifierQNN
+from sklearn.datasets import make_moons
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import torch
+import jax
+
+NOISE = .2
+EPOCHS = 100
+N_SAMPLES = 500
+N_FEATURES = 4
+N_LAYERS = 5
+
+# get and encode the make moons data set
+data, target = make_moons(n_samples=N_SAMPLES,noise=NOISE)
+
+# encode data
+scalerOHE = OneHotEncoder(sparse_output=False)
+encoded_target = scalerOHE.fit_transform(target.reshape(-1,1))
+  
+# encode target
+sScaler = StandardScaler()
+encoded_data = sScaler.fit_transform(data)
+
+# enhance feature space
+autoencoder = Autoencoder(encoded_data, N_FEATURES)
+enhanced_data = autoencoder.encoder(torch.from_numpy(encoded_data).float()).detach().numpy()
+
+# train the model
+strongly_entangled_ansatz = ClassifierQNN(models.strongly_entangled_ansatz, enhanced_data, encoded_target, N_LAYERS)
+strongly_entangled_ansatz.train_test_split()
+
+# score the model
+strongly_entangled_ansatz.learn_model(epochs=100)
+strongly_entangled_ansatz.score_model()
+fig = strongly_entangled_ansatz.plot_fit(show=True, decoded_data=encoded_data)
+
+```
+
+The resulting accuracy and cross entropy loss and accuracy is...
+
+```
+Cross entropy loss on training set: 0.32373467087745667
+Accuracy of fullmodel on training set: 0.8975
+
+Cross entropy loss on test set: 0.31316033005714417
+Accuracy of fullmodel on test set: 0.91
+```
+
+![classification using complex ansatz](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/strongly_entangling_ansatz/features=4&layers=5&epochs=100&noise=0.2.svg?raw=true)
+
+[Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605) suggests that by reuploading the data via angle encoding we also increase the availiable number of trainable fourier coefficents. What does this mean exactly? Well a linear classifier would, theoretically, have access to only one fourier coefficent:
+
+
 
 
 
@@ -143,3 +200,7 @@ Sample Fisher Information eigenvalue distributions
 
 ![Eigenvalue distribution of classical fisher information matrix](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classical_fisher/compare_VQC_models.svg?raw=true)
 
+
+## Outlooks
+
+Beyond the work outlined here, it would be good to apply some noise simulations as we would likely find that larger models such as the mid-circuit measurements would drop off in utility. Moreover we could attempt to implement a quantum model where non-linearites are induced by the open quantum dynamics of a noisy system.
