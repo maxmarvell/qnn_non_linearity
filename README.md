@@ -62,7 +62,7 @@ output = [Array(0.44702205, dtype=float32), Array(0.09808806, dtype=float32)]
 
 Of course these results are completely arbitrary and mean nothing, just that the quantum model produced an output. With this groundwork, however, we can now begin to train the model parameters and see if the model can actually handle a standardised non-linear classifcation task, here we use the make_moons library. As standard we will enhance the feature space of the make_moons library to 4 features, by using an autoencoder, then decode the results where necessary. Here is an example of training a VQC with a simple ansatz structure:
 
-![circuit diagram basic entangler](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/basic_entangler.jpg?raw=true)
+![circuit diagram basic entangler](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/circuits/basic_entangling.jpg?raw=true)
 
 ```
 from non_linear.models import simple_ansatz
