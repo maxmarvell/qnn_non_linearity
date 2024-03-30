@@ -20,6 +20,8 @@ from non_linear.fisher import FisherInformation
 from non_linear.qfisher import QuantumFisherInformation
 from non_linear.utils.linked_list import NNLinkedList, Node
 
+import numpy as onp
+
 from numpy import ndarray
 from copy import deepcopy
 
@@ -147,13 +149,13 @@ class QCNN():
                 fisher = FisherInformation(compiler)
                 batched = jax.vmap(fisher.fisher_information, (None, 0))
                 res = jax.jit(batched)(inputs, params[depth:depth+num_params].reshape(parameter_shape))
-                fisher.fisher_information_matrix, fisher.fisher_eigenvalues = res
+                fisher.matrix, fisher.eigenvalues = res
                 new_node.fisher_information = fisher
 
                 qfisher = QuantumFisherInformation(compiler)
                 batched = jax.vmap(fisher.fisher_information, (None, 0))
                 res = jax.jit(batched)(inputs, params[depth:depth+num_params].reshape(parameter_shape))
-                qfisher.quantum_fisher_information_matrix, qfisher.quantum_eigenvalues = res
+                qfisher.matrix, qfisher.eigenvalues = res
                 new_node.quantum_fisher_information = qfisher
 
 
@@ -376,8 +378,26 @@ class QCNN():
 
         return figure
     
-    def plot_fishers(self):
-        pass
+    def plot_fishers(self, show:bool = False, ax = None):
+
+        assert self.llist != None, "need to train the model first"
+
+        # if no array of axes provided set a default
+        if type(ax) != ndarray: 
+            fig, ax = plt.subplots(1, len(self.training_data), figsize=(10,4))
+
+
+        for i, state in enumerate(self.training_data):
+
+            data = state.head
+
+            ax[i].set_title(i*25)
+            ax[i].boxplot(jnp.array(data.fisher_information.eigenvalues)[0])
+
+        plt.show()
+
+
+
 
     def plot_qfishers(self):
         pass

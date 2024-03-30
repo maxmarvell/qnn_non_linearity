@@ -24,6 +24,7 @@ from non_linear.utils.linked_list import NNLinkedList, LearnModelData
 from non_linear.autoencoder import Autoencoder
 
 from numpy import ndarray
+import numpy as onp
 
 # Class for classification tasks
 class ClassifierQNN():
@@ -129,20 +130,23 @@ class ClassifierQNN():
 
                 i = epoch // 25
 
-                fisher = FisherInformation(self.compiler)
-                fisher.fisher_information_matrix, fisher.fisher_eigenvalues = fisher.batched_fisher_information(self.X_train, params)
+                # fisher = FisherInformation(self.compiler)
+                # fisher.fisher_information_matrix, fisher.fisher_eigenvalues = fisher.batched_fisher_information(self.X_train, params)
 
-                qfisher = QuantumFisherInformation(self.compiler)
-                qfisher.quantum_fisher_information_matrix, qfisher.quantum_fisher_eigenvalues = qfisher.batched_quantum_fisher_information(self.X_train, params)
+                # qfisher = QuantumFisherInformation(self.compiler)
+                # qfisher.quantum_fisher_information_matrix, qfisher.quantum_fisher_eigenvalues = qfisher.batched_quantum_fisher_information(self.X_train, params)
 
 
-                y_pred = self.qnn(self.data, params)
+                # y_pred = self.qnn(self.data, params)
 
                 data = LearnModelData(
-                    quantum_fisher_information=qfisher,
-                    fisher_information=fisher,
-                    y_pred=y_pred
+                    # quantum_fisher_information=qfisher,
+                    # fisher_information=fisher,
+                    params=params,
+                    # y_pred=y_pred
                 )
+
+                data.epoch = epoch
                 
                 self.training_data.append(data)
 
@@ -258,3 +262,63 @@ class ClassifierQNN():
     def fourier_coefficents(self, n_samples:int = 100, n_coeffs:int = 5, show:bool = False, ax = None):
         self.fourier.random_sample(n_coeffs, n_samples)
         return self.fourier.plot_coeffs(show, ax)
+
+    
+
+    def plot_fisher_histogram(self, show:bool = False, ax = None):
+        
+        assert self.training_data != None, "need to train the model first"
+
+        # if no array of axes provided set a default
+        if type(ax) != ndarray: 
+            fig, ax = plt.subplots(1, len(self.training_data), figsize=(15,4), sharey=True)
+
+        for state in self.training_data:
+
+            fisher_matrices = jnp.empty(shape=(self.X_train.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
+            eigenvalues = jnp.empty(shape=(self.X_train.shape[0], np.product(self.parameter_shape,)))
+
+            fisher = FisherInformation(self.compiler)
+            values, grads = fisher.batched_fisher_information(self.X_train, state.params)
+
+            values = onp.asarray(values)
+            grads = onp.asarray(grads)
+
+            for i in range(self.X_train.shape[0]):
+                fisher_matrices = fisher_matrices.at[i].set(onp.sum(onp.outer(grads[i,j],grads[i,j])/values[i,j] for j in fisher.batch_index))
+                eigenvalues = eigenvalues.at[i].set(onp.linalg.eigvals(fisher_matrices[i]))
+
+
+            fisher.matrices = fisher_matrices
+            fisher.eigenvalues = eigenvalues
+
+            state.fisher_information = fisher
+
+        for i, state in enumerate(self.training_data):
+            ax[i].set_title(state.epoch)
+            ax[i].boxplot(state.fisher_information.eigenvalues.reshape(-1))
+
+        plt.show()
+
+
+    def plot_quantum_fisher(self, show:bool = False, ax = None):
+
+        assert self.training_data != None, "need to train the model first"
+
+        # if no array of axes provided set a default
+        if type(ax) != ndarray: 
+            fig, ax = plt.subplots(1, len(self.training_data), figsize=(10,4))
+        
+        for state in self.training_data:
+            qfisher = QuantumFisherInformation(self.compiler)
+            qfisher.matrix, qfisher.eigenvalues = qfisher.batched_quantum_fisher_information(self.X_train, state.params)
+
+            state.fisher_information = qfisher
+
+        for i, state in enumerate(self.training_data):
+            ax[i].set_title(state.epoch)
+            ax[i].boxplot(state.fisher_information.eigenvalues.reshape(-1))
+        
+        plt.show()
+
+

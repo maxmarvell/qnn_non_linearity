@@ -109,12 +109,14 @@ class FisherInformation():
         batched = jax.vmap(self.batched_gradient, (0, None))
         value, grad = jax.jit(batched)(inputs, params)
 
-        fisher_matrices = np.empty(shape=(inputs.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
-        eigenvalues = np.empty(shape=(inputs.shape[0], np.product(self.parameter_shape,)))
+        return value, grad
+
+        fisher_matrices = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
+        eigenvalues = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape,)))
 
         for i in range(inputs.shape[0]):
-            fisher_matrices[i] = np.sum(np.outer(grad[i,j],grad[i,j])/value[i,j] for j in self.batch_index)
-            eigenvalues[i] = np.linalg.eigvals(fisher_matrices[i])
+            fisher_matrices = fisher_matrices.at[i].set(jnp.sum(jnp.outer(grad[i,j],grad[i,j])/value[i,j] for j in self.batch_index))
+            eigenvalues = eigenvalues.at[i].set(jnp.linalg.eigvals(fisher_matrices[i]))
 
         return fisher_matrices, eigenvalues
 

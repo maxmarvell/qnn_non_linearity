@@ -211,7 +211,11 @@ Accuracy of fullmodel on test set: 0.95
 
 ![classification with mid measure ](https://github.com/maxmarvell/qnn_non_linearity/blob/main/graphs/classifier/mid_circuit/features=4&layers=5&epochs=100&noise=0.2&repititions=5.svg?raw=true)
 
-How could we have predicted this type of behaviour? What metrics can we use to score a particular model prior to using it? There are four things we explored in this 
+How could we have predicted this type of behaviour? What metrics can we use to score a particular model prior to using it? There are four methods we explored in this work. 
+
+1. The first was to use the variational quantum circuits as elementary perceptrons in a convolutional model. Then apply classical activation functions and observe whether there is a significant shift in the amount of non-linearity present within the nodel.
+
+2. Utilis a method developed in [Schuld, M. 2020](https://doi.org/10.48550/arXiv.2008.08605), representing the model as a 
 
 Prior to running the model on a standardised classification library, metrics were utilised to predict the power of each model. Three metrics were utilised. 
 

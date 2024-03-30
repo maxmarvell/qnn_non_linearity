@@ -6,11 +6,13 @@ class LearnModelData:
     def __init__(self, 
                  fisher_information:FisherInformation = None, 
                  quantum_fisher_information:QuantumFisherInformation = None,
+                 params:ndarray = None,
                  y_pred:ndarray = None):
         
         self.fisher_information = fisher_information
         self.quantum_fisher_information = quantum_fisher_information
         self.y_pred = y_pred
+        self.params = params
 
 class Node(LearnModelData):
     def __init__(self, layer):
