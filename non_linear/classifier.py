@@ -338,23 +338,11 @@ class ClassifierQNN():
 
         for state in self.training_data:
 
-            fisher_matrices = jnp.empty(shape=(self.X_train.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
-            eigenvalues = jnp.empty(shape=(self.X_train.shape[0], np.product(self.parameter_shape,)))
-
             fisher = FisherInformation(self.compiler)
-            values, grads = fisher.batched_fisher_information(self.X_train, state.params)
+            matrices, eigenvalues = fisher.batched_fisher_information(self.X_train, state.params)
 
-            values = onp.asarray(values)
-            grads = onp.asarray(grads)
-
-            for i in range(self.X_train.shape[0]):
-                fisher_matrices = fisher_matrices.at[i].set(onp.sum(onp.outer(grads[i,j],grads[i,j])/values[i,j] for j in fisher.batch_index))
-                eigenvalues = eigenvalues.at[i].set(onp.linalg.eigvals(fisher_matrices[i]))
-
-
-            fisher.matrices = fisher_matrices
+            fisher.matrices = matrices
             fisher.eigenvalues = eigenvalues
-
             state.fisher_information = fisher
 
         for i, state in enumerate(self.training_data):
