@@ -1,9 +1,11 @@
 from functools import partial
 import matplotlib.pyplot as plt
 from pennylane import numpy as np
-from numpy import ndarray
 import jax
 import jax.numpy as jnp
+
+from numpy import ndarray
+import numpy as onp
 
 from non_linear.models import qnn_compiler
 
@@ -35,7 +37,7 @@ class FisherInformation():
     @partial(jax.jit, static_argnums=(0,))
     def get_gradient(self, inputs:ndarray, params:ndarray, i:int):
         '''
-            function to compute a partial gradient of a single bitstring outcome probability
+            function to compute a gradient of a single bitstring outcome probability
 
             args:
                 inputs: a numpy array containing one sample
@@ -65,7 +67,7 @@ class FisherInformation():
 
         '''
             function that interfaces the batched gradient to compute a single fisher information instance
-            WARNING this func cannot not be batched over inp
+            WARNING this func cannot be batched over inputs
 
             args:
                 input: a numpy array containing one sample
@@ -99,26 +101,54 @@ class FisherInformation():
 
         '''
             function that batches over self.fisher_information to compute the matrix for many samples
-            specif
+            implemented using pure callbacks to compute fisher matrices and eigenvalues
+
+            DISCLAIMER pure callbacks increase runtime however only utilised for post-processing here
 
             args:
                 inputs: a numpy array containing many samples
                 params: a numpy array containing a single parametrisation of the qnn
+
+            returns:
+                matrices: a (n, m, m) array with the fisher information matrix for each sample
+                eignevalues: a (n, m) array with the eigenvalues for each sample
         '''
 
         batched = jax.vmap(self.batched_gradient, (0, None))
-        value, grad = jax.jit(batched)(inputs, params)
+        values, grads = jax.jit(batched)(inputs, params)
 
-        return value, grad
+        # specify the fisher shape and dtype of the eigenvalues
+        fisher_shape_dtype = jax.ShapeDtypeStruct(
+            shape=(inputs.shape[0], params.reshape(-1).shape[0], params.reshape(-1).shape[0], ),
+            dtype=values.dtype
+        )
 
-        fisher_matrices = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
-        eigenvalues = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape,)))
+        # numpy function for pure callback
+        def compute_fisher(values, grads):
+            matrices = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape), np.product(self.parameter_shape)))
+            for i in range(inputs.shape[0]):
+                matrices = matrices.at[i].set(onp.sum(onp.outer(grads[i,j],grads[i,j])/values[i,j] for j in self.batch_index))
+            return matrices
+        
+        # compute the fisher matrices using pure callback method
+        matrices = jax.pure_callback(compute_fisher, fisher_shape_dtype, values, grads)
 
-        for i in range(inputs.shape[0]):
-            fisher_matrices = fisher_matrices.at[i].set(jnp.sum(jnp.outer(grad[i,j],grad[i,j])/value[i,j] for j in self.batch_index))
-            eigenvalues = eigenvalues.at[i].set(jnp.linalg.eigvals(fisher_matrices[i]))
+        # specify the ouput shape and dtype of the eigenvalues
+        eignevalue_shape_dtype = jax.ShapeDtypeStruct(
+            shape=(inputs.shape[0], params.reshape(-1).shape[0],),
+            dtype=values.dtype
+        )
 
-        return fisher_matrices, eigenvalues
+
+        def f(matrices):
+            eigenvalues = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape,)))
+            for i in range(inputs.shape[0]):
+                eigenvalues = eigenvalues.at[i].set(onp.linalg.eigvals(matrices[i]))
+            return eigenvalues
+        
+        eigenvalues = jax.pure_callback(f, eignevalue_shape_dtype, matrices)
+
+        return matrices, eigenvalues
 
 
     def sample_fisher_information_matrix(self, n_samples:int = 100):
