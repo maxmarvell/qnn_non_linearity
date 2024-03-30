@@ -67,11 +67,16 @@ class FisherInformation():
 
         '''
             function that interfaces the batched gradient to compute a single fisher information instance
-            WARNING this func cannot be batched over inputs
+
+            WARNING this function cannot be batched over inputs for this utilise batched_fisher_information directly
 
             args:
                 input: a numpy array containing one sample
                 params: a numpy array containing a single parametrisation of the qnn
+
+            returns:
+                matrix: a (m, m) array with the fisher information matrix
+                eignevalues: a (m, ) array with the eigenvalues
         '''
 
         value, grad = self.batched_gradient(input, params)
@@ -81,20 +86,24 @@ class FisherInformation():
             dtype=value.dtype
         )
 
-        f = lambda value, grad: jnp.sum(jnp.outer(grad[j],grad[j])/value[j] for j in self.batch_index)
+        # numpy function for pure callback
+        compute_fisher = lambda value, grad: jnp.sum(jnp.outer(grad[j],grad[j])/value[j] for j in self.batch_index)
 
-        fisher_matrix = jax.pure_callback(f, result_shape_dtype, value, grad)
+        # compute the fisher matrix of the sample using a pure callback
+        matrix = jax.pure_callback(compute_fisher, result_shape_dtype, value, grad)
 
         eignevalue_shape_dtype = jax.ShapeDtypeStruct(
             shape=(params.reshape(-1).shape[0],),
             dtype=value.dtype
         )
 
-        g = lambda x: jnp.linalg.eigvals(x)
+        # numpy function for pure callback
+        compute_eigenvalues = lambda x: jnp.linalg.eigvals(x)
 
-        eigenvalues = jax.pure_callback(g, eignevalue_shape_dtype, fisher_matrix)
+        # compute the eigenvalues with a pure callback
+        eigenvalues = jax.pure_callback(compute_eigenvalues, eignevalue_shape_dtype, matrix)
         
-        return fisher_matrix, eigenvalues
+        return matrix, eigenvalues
     
     @partial(jax.jit, static_argnums=(0,))
     def batched_fisher_information(self, inputs:ndarray, params:ndarray):
@@ -139,14 +148,15 @@ class FisherInformation():
             dtype=values.dtype
         )
 
-
-        def f(matrices):
+        # numpy function for pure callback
+        def compute_eigenvalues(matrices):
             eigenvalues = jnp.empty(shape=(inputs.shape[0], np.product(self.parameter_shape,)))
             for i in range(inputs.shape[0]):
                 eigenvalues = eigenvalues.at[i].set(onp.linalg.eigvals(matrices[i]))
             return eigenvalues
         
-        eigenvalues = jax.pure_callback(f, eignevalue_shape_dtype, matrices)
+        # compute the eigenvalues of each sample with a pure callback
+        eigenvalues = jax.pure_callback(compute_eigenvalues, eignevalue_shape_dtype, matrices)
 
         return matrices, eigenvalues
 
@@ -158,6 +168,10 @@ class FisherInformation():
 
             **kwargs:
                 n_samples: an integer representing the number of samples to take
+
+            returns:
+                matrices: a (n, m, m) array with the fisher information matrix for each sample
+                eignevalues: a (n, m) array with the eigenvalues for each sample
         '''
 
         # random inputs
@@ -166,15 +180,10 @@ class FisherInformation():
         # random initial parameters - but same for each sample
         self.params = jax.random.uniform(jax.random.PRNGKey(10), shape=self.parameter_shape)
 
-        # batch the fishers
-        batched = jax.vmap(self.fisher_information, (0, None,))
-        fishers = jax.jit(batched)
-
         # process all the samples
-        res = fishers(self.inputs, self.params)
-        self.fisher_matrices, self.eigenvalues = res
+        matrices, eigenalues = self.batched_fisher_information(self.inputs, self.params)
 
-        return res
+        return matrices, eigenalues
 
     def plot_eigenvalue_distribution(self, show:bool = None, ax = None):
 
